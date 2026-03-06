@@ -4,6 +4,10 @@ A web-based fitness tracking platform designed for people with health conditions
 
 The system helps users plan workouts and diets while adapting recommendations based on individual health conditions and fitness goals.
 
+## Demo
+
+See the demo video: demo.mov
+
 ## Features
 
 ### Fitness Tracking
