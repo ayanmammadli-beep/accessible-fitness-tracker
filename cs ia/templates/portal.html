@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitAdapt Workout Portal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v={{ time.time() }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header class="portal-header">
+        <h1>Welcome, <span class="highlight">{{ full_name }}</span></h1>
+        <nav class="nav-menu">
+            <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+            <a href="{{ url_for('workout_finder') }}" class="nav-link active">Workout Portal</a>
+            <a href="{{ url_for('diet_management') }}" class="nav-link">Diet</a>
+        </nav>
+        <button class="btn logout-btn" onclick="window.location.href='{{ url_for('logout') }}'">Logout</button>
+    </header>
+
+    <div class="portal-container">
+        <aside class="filters-sidebar">
+            <div class="filter-sidebar-header">
+                <h2 class="filter-heading">Create Your <span class="highlight">Workout Plan</span></h2>
+                <button id="collapse-all-filters" class="btn icon-btn">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+            <div class="filter-section">
+                <div class="filter-header collapsible">
+                    <h3>Fitness Priority</h3>
+                    <i class="fas fa-bullseye"></i>
+                    <i class="fas fa-chevron-down toggle-icon"></i>
+                </div>
+                <div class="filter-content">
+                    <p class="filter-description">Select your main fitness goal to focus your workout plan.</p>
+                    <select name="priority" id="priority-dropdown" class="goal-dropdown">
+                        <option value="">All Priorities</option>
+                        {% for priority in fitness_priorities %}
+                        <option value="{{ priority.id }}">{{ priority.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="filter-section">
+                <div class="filter-header collapsible">
+                    <h3>Health Considerations</h3>
+                    <i class="fas fa-heartbeat"></i>
+                    <i class="fas fa-chevron-down toggle-icon"></i>
+                </div>
+                <div class="filter-content">
+                    <p class="filter-description">Select any health conditions you have so we can customize your workout plan.</p>
+                    <div class="checkbox-list">
+                        {% for condition in health_conditions %}
+                        <label class="checkbox-item">
+                            <input type="checkbox" name="conditions" value="{{ condition.id }}">
+                            <span class="checkbox-label">{{ condition.name }}</span>
+                            <span class="tooltip-text">{{ condition.description }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <button type="button" onclick="applyFilters()" class="btn primary-btn filter-btn">
+                    <i class="fas fa-filter"></i> Apply Filters
+                </button>
+
+                <button type="button" onclick="resetFilters()" class="btn secondary-btn reset-btn">
+                    <i class="fas fa-undo"></i> Reset Filters
+                </button>
+            </div>
+        </aside>
+
+        <main class="recommended-workouts">
+            <div class="section-header">
+                <h2>Recommended <span class="highlight">Workouts</span></h2>
+                <div id="result-count" class="result-count">0 workouts found</div>
+            </div>
+
+            <div id="loading-indicator" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Finding workouts...</p>
+            </div>
+
+            <div id="workout-list" class="workout-list">
+            </div>
+        </main>
+        <section class="my-workout-plan">
+            <div class="section-header">
+                <h2>My <span class="highlight">Workout Plan</span></h2>
+                <button onclick="clearAllWorkouts()" class="btn secondary-btn small-btn">
+                    <i class="fas fa-trash"></i> Clear All
+                </button>
+            </div>
+
+            <div id="my-workouts-empty" class="empty-state">
+                <i class="fas fa-dumbbell"></i>
+                <p>Add workouts from the recommendations to build your personal plan.</p>
+            </div>
+
+            <div id="my-workouts-list" class="my-workouts-list">
+            </div>
+
+            <div class="my-workouts-footer">
+                <button id="schedule-all-btn" onclick="scheduleAllWorkouts()" class="btn secondary-btn" disabled>
+                    <i class="fas fa-calendar-check"></i> Schedule All
+                </button>
+                <button id="go-to-dashboard-btn" onclick="goToDashboard()" class="btn primary-btn" disabled>
+                    <i class="fas fa-arrow-right"></i> View Final Schedule
+                </button>
+            </div>
+        </section>
+    </div>
+    <div class="streak-container">
+        <div class="streak-card">
+            <div class="streak-info">
+                <h2>Your Workout <span class="highlight">Streak</span></h2>
+                <p class="streak-subtitle">Keep up your daily fitness routine!</p>
+            </div>
+
+            <div class="streak-visualization">
+                <div class="streak-counter-wrapper">
+                    <div class="streak-counter-display">
+                        <span id="streak-counter">0</span>
+                        <div class="streak-aura"></div>
+                    </div>
+                    <div class="streak-fire">
+                        <i class="fas fa-fire"></i>
+                    </div>
+                </div>
+
+                <div class="streak-days-label">CONSECUTIVE DAYS</div>
+
+                <div class="streak-progress-container">
+                    <div class="streak-progress-track">
+                        <div class="streak-progress-fill" id="streak-progress-fill"></div>
+                        <div class="glow-effect"></div>
+                    </div>
+
+                    <div class="streak-milestones">
+                        <div class="streak-milestone" style="left: 0%">0</div>
+                        <div class="streak-milestone" style="left: 20%">7</div>
+                        <div class="streak-milestone" style="left: 40%">14</div>
+                        <div class="streak-milestone" style="left: 60%">21</div>
+                        <div class="streak-milestone" style="left: 80%">28</div>
+                        <div class="streak-milestone" style="left: 100%">30+</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="streak-message">
+                <div class="streak-stats">
+                    <div class="streak-stat">
+                        <span class="streak-stat-number" id="current-streak">0</span>
+                        <span class="streak-stat-label">Current</span>
+                    </div>
+                    <div class="streak-stat">
+                        <span class="streak-stat-number" id="longest-streak">0</span>
+                        <span class="streak-stat-label">Best</span>
+                    </div>
+                    <div class="streak-stat">
+                        <span class="streak-stat-number" id="last-login">Today</span>
+                        <span class="streak-stat-label">Last Login</span>
+                    </div>
+                </div>
+                <div class="streak-badges">
+                    <div class="streak-badge" id="streak-badge-7">
+                        <i class="fas fa-medal"></i>
+                        <span>7 Days</span>
+                    </div>
+                    <div class="streak-badge" id="streak-badge-14">
+                        <i class="fas fa-award"></i>
+                        <span>14 Days</span>
+                    </div>
+                    <div class="streak-badge" id="streak-badge-30">
+                        <i class="fas fa-trophy"></i>
+                        <span>30 Days</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="video-modal" class="modal">
+        <div class="modal-content video-modal-content">
+            <div class="modal-header">
+                <h2 id="video-title">Workout Video</h2>
+                <span class="close-modal" onclick="closeVideoModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="video-container" class="video-container">
+                </div>
+                <div class="video-details">
+                    <div id="video-description" class="video-description"></div>
+                    <div class="video-actions">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="schedule-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule Workout</h2>
+                <span class="close-modal" onclick="closeScheduleModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Select a date for <span id="schedule-workout-title"></span>:</p>
+                <input type="date" id="schedule-date" class="date-picker" min="">
+                <input type="hidden" id="schedule-workout-id">
+                <div class="modal-actions">
+                    <button class="btn secondary-btn" onclick="closeScheduleModal()">Cancel</button>
+                    <button class="btn primary-btn" onclick="confirmScheduleWorkout()">Schedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="schedule-all-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule All Workouts</h2>
+                <span class="close-modal" onclick="closeScheduleAllModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Select a starting date for your workout plan:</p>
+                <input type="date" id="schedule-all-date" class="date-picker" min="">
+                <div class="schedule-all-options">
+                    <h3>Schedule Pattern</h3>
+                    <div class="radio-group">
+                        <label class="radio-item">
+                            <input type="radio" name="schedule-pattern" value="consecutive" checked>
+                            <span>Consecutive Days</span>
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="schedule-pattern" value="alternate">
+                            <span>Every Other Day</span>
+                        </label>
+                        <label class="radio-item">
+                            <input type="radio" name="schedule-pattern" value="weekdays">
+                            <span>Weekdays Only</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn secondary-btn" onclick="closeScheduleAllModal()">Cancel</button>
+                    <button class="btn primary-btn" onclick="confirmScheduleAllWorkouts()">Schedule All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification">
+        <div class="notification-content">
+            <i class="fas fa-check-circle"></i>
+            <span id="notification-message">Operation successful!</span>
+        </div>
+        <button class="notification-close" onclick="closeNotification()">×</button>
+    </div>
+
+<script>
+let savedWorkouts = [];
+let currentWorkouts = [];
+let notificationTimeout = null;
+
+document.addEventListener("DOMContentLoaded", function () {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('schedule-date').min = today;
+    document.getElementById('schedule-date').value = today;
+    document.getElementById('schedule-all-date').min = today;
+    document.getElementById('schedule-all-date').value = today;
+
+    loadFilters();
+    document.querySelectorAll('input[name="conditions"]').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const conditionValues = Array.from(document.querySelectorAll('input[name="conditions"]:checked'))
+                .map(cb => cb.value);
+            localStorage.setItem('filterConditions', JSON.stringify(conditionValues));
+        });
+    });
+
+    document.getElementById('priority-dropdown').addEventListener('change', function() {
+        localStorage.setItem('filterPriority', this.value);
+    });
+
+    fetchWorkouts();
+    loadSavedWorkouts();
+
+    initCollapsible();
+    fetchUserStreak();
+});
+
+function loadFilters() {
+    const savedPriority = localStorage.getItem('filterPriority');
+    if (savedPriority) {
+        document.getElementById('priority-dropdown').value = savedPriority;
+    }
+
+    const savedConditions = localStorage.getItem('filterConditions');
+    if (savedConditions) {
+        const conditionValues = JSON.parse(savedConditions);
+        document.querySelectorAll('input[name="conditions"]').forEach(checkbox => {
+            checkbox.checked = conditionValues.includes(checkbox.value);
+        });
+    }
+}
+
+function showNotification(message, type = 'success', duration = 3000) {
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+    }
+    const notification = document.getElementById('notification');
+    const notificationMessage = document.getElementById('notification-message');
+    const icon = notification.querySelector('i');
+
+    notificationMessage.textContent = message;
+    notification.className = 'notification ' + type;
+
+    if (type === 'success') {
+        icon.className = 'fas fa-check-circle';
+    } else if (type === 'error') {
+        icon.className = 'fas fa-exclamation-circle';
+    } else if (type === 'info') {
+        icon.className = 'fas fa-info-circle';
+    }
+
+    notification.classList.add('visible');
+
+    notificationTimeout = setTimeout(() => {
+        closeNotification();
+    }, duration);
+}
+
+function closeNotification() {
+    const notification = document.getElementById('notification');
+    notification.classList.remove('visible');
+}
+
+function fetchUserStreak() {
+    fetch('/get-user-streak')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to fetch streak data');
+            }
+            return response.json();
+        })
+        .then(data => {
+            initializeStreakCounter(data);
+        })
+        .catch(error => {
+            console.error('Error fetching streak data:', error);
+            initializeStreakCounter({
+                current: 1,
+                longest: 1,
+                lastLogin: 'Today'
+            });
+        });
+}
+
+function initializeStreakCounter(streakData) {
+    document.getElementById('streak-counter').textContent = '0';
+    document.getElementById('current-streak').textContent = streakData.current;
+    document.getElementById('longest-streak').textContent = streakData.longest;
+    document.getElementById('last-login').textContent = streakData.lastLogin;
+
+    const fillPercent = Math.min((streakData.current / 30) * 100, 100);
+    const progressFill = document.getElementById('streak-progress-fill');
+    progressFill.style.width = '0%';
+
+    activateStreakBadges(streakData.current);
+    animateStreakCounter(streakData.current);
+    animateProgressBar(fillPercent);
+    animateFlame();
+}
+
+function animateStreakCounter(targetValue) {
+    const counter = document.getElementById('streak-counter');
+    let currentValue = 0;
+    const incrementAmount = Math.max(1, Math.floor(targetValue / 50));
+    const duration = 1500;
+    const interval = Math.floor(duration / (targetValue / incrementAmount));
+    const countInterval = setInterval(() => {
+        currentValue += incrementAmount;
+        if (currentValue >= targetValue) {
+            counter.textContent = targetValue;
+            clearInterval(countInterval);
+            counter.classList.add('pulse-effect');
+            setTimeout(() => {
+                counter.classList.remove('pulse-effect');
+            }, 1000);
+        } else {
+            counter.textContent = currentValue;
+        }
+    }, interval);
+}
+
+function animateProgressBar(targetPercent) {
+    const progressBar = document.getElementById('streak-progress-fill');
+    let currentWidth = 0;
+    const fillAnimation = setInterval(() => {
+        currentWidth += 1;
+        progressBar.style.width = currentWidth + '%';
+        if (currentWidth >= targetPercent) {
+            clearInterval(fillAnimation);
+        }
+    }, 15);
+}
+
+function activateStreakBadges(streak) {
+    document.querySelectorAll('.streak-badge').forEach(badge => {
+        badge.classList.remove('active');
+    });
+    if (streak >= 7) {
+        document.getElementById('streak-badge-7').classList.add('active');
+    }
+    if (streak >= 14) {
+        document.getElementById('streak-badge-14').classList.add('active');
+    }
+    if (streak >= 30) {
+        document.getElementById('streak-badge-30').classList.add('active');
+    }
+}
+
+function animateFlame() {
+    const flame = document.querySelector('.streak-fire i');
+    setInterval(() => {
+        flame.classList.add('flame-pulse');
+        setTimeout(() => {
+            flame.classList.remove('flame-pulse');
+        }, 1000);
+    }, 2000);
+}
+
+function initCollapsible() {
+    const collapsibles = document.querySelectorAll('.collapsible');
+    collapsibles.forEach(header => {
+        header.addEventListener('click', function() {
+            this.classList.toggle('active');
+            const content = this.parentElement.querySelector('.filter-content');
+            if (content.style.maxHeight) {
+                content.style.maxHeight = null;
+                this.querySelector('.toggle-icon').classList.replace('fa-chevron-up', 'fa-chevron-down');
+            } else {
+                content.style.maxHeight = content.scrollHeight + "px";
+                this.querySelector('.toggle-icon').classList.replace('fa-chevron-down', 'fa-chevron-up');
+            }
+        });
+    });
+
+    document.getElementById('collapse-all-filters').addEventListener('click', function() {
+        const isExpanded = this.querySelector('i').classList.contains('fa-chevron-down');
+        if (isExpanded) {
+            this.querySelector('i').classList.replace('fa-chevron-down', 'fa-chevron-up');
+        } else {
+            this.querySelector('i').classList.replace('fa-chevron-up', 'fa-chevron-down');
+        }
+        collapsibles.forEach(header => {
+            const content = header.parentElement.querySelector('.filter-content');
+            if (isExpanded) {
+                content.style.maxHeight = content.scrollHeight + "px";
+                header.classList.add('active');
+                header.querySelector('.toggle-icon').classList.replace('fa-chevron-down', 'fa-chevron-up');
+            } else {
+                content.style.maxHeight = null;
+                header.classList.remove('active');
+                header.querySelector('.toggle-icon').classList.replace('fa-chevron-up', 'fa-chevron-down');
+            }
+        });
+    });
+
+    collapsibles.forEach(header => {
+        const content = header.parentElement.querySelector('.filter-content');
+        content.style.maxHeight = content.scrollHeight + "px";
+        header.classList.add('active');
+        header.querySelector('.toggle-icon').classList.replace('fa-chevron-down', 'fa-chevron-up');
+    });
+}
+
+function fetchWorkouts() {
+    showLoading(true);
+    const conditions = Array.from(document.querySelectorAll('input[name="conditions"]:checked')).map(cb => cb.value);
+    const priority = document.getElementById('priority-dropdown').value;
+    fetch('/filter-workouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conditions: conditions, priority: priority })
+    })
+    .then(response => response.json())
+    .then(data => {
+        currentWorkouts = data.workouts;
+        displayWorkouts(data.workouts);
+        showLoading(false);
+    })
+    .catch(error => {
+        console.error('Error fetching workouts:', error);
+        showLoading(false);
+        showNotification('Failed to load workouts. Please try again.', 'error');
+    });
+}
+
+
+function loadSavedWorkouts() {
+    const storedWorkouts = localStorage.getItem('savedWorkouts');
+    if (storedWorkouts) {
+         savedWorkouts = JSON.parse(storedWorkouts);
+    }
+    updateMyWorkoutsList();
+    updateGoToDashboardButton();
+}
+
+function updateGoToDashboardButton() {
+    const dashboardBtn = document.getElementById('go-to-dashboard-btn');
+    const scheduleAllBtn = document.getElementById('schedule-all-btn');
+    if (savedWorkouts.length > 0) {
+        dashboardBtn.disabled = false;
+        scheduleAllBtn.disabled = false;
+    } else {
+        dashboardBtn.disabled = true;
+        scheduleAllBtn.disabled = true;
+    }
+}
+
+function goToDashboard() {
+    const btn = document.getElementById('go-to-dashboard-btn');
+    btn.classList.add('btn-pulse');
+    setTimeout(() => {
+        window.location.href = '/dashboard';
+    }, 300);
+}
+
+function applyFilters() {
+    const priority = document.getElementById('priority-dropdown').value;
+    const conditions = Array.from(document.querySelectorAll('input[name="conditions"]:checked')).map(cb => cb.value);
+    localStorage.setItem('filterPriority', priority);
+    localStorage.setItem('filterConditions', JSON.stringify(conditions));
+    fetchWorkouts();
+}
+
+function resetFilters() {
+    document.querySelectorAll('input[name="conditions"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.getElementById('priority-dropdown').value = "";
+    localStorage.removeItem('filterPriority');
+    localStorage.removeItem('filterConditions');
+    fetchWorkouts();
+    showNotification('Filters have been reset', 'info');
+}
+
+function showLoading(show) {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const workoutList = document.getElementById('workout-list');
+    if (show) {
+        loadingIndicator.style.display = 'flex';
+        workoutList.style.opacity = '0.3';
+    } else {
+        loadingIndicator.style.display = 'none';
+        workoutList.style.opacity = '1';
+    }
+}
+
+function displayWorkouts(workouts) {
+    const workoutList = document.getElementById("workout-list");
+    const resultCount = document.getElementById("result-count");
+    workoutList.innerHTML = "";
+    if (workouts.length === 0) {
+        workoutList.innerHTML = `
+            <div class="no-results">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>No workouts found for your current filters.</p>
+                <p>Try different filter options or <button onclick="resetFilters()" class="btn text-btn">reset filters</button>.</p>
+            </div>`;
+        resultCount.textContent = "0 workouts found";
+        return;
+    }
+    resultCount.textContent = `${workouts.length} workout${workouts.length === 1 ? '' : 's'} found`;
+    workouts.forEach((workout, index) => {
+        let difficultyClass = '';
+        if (workout.difficulty === 'Beginner') difficultyClass = 'difficulty-beginner';
+        else if (workout.difficulty === 'Intermediate') difficultyClass = 'difficulty-intermediate';
+        else if (workout.difficulty === 'Advanced') difficultyClass = 'difficulty-advanced';
+
+        const isInPlan = savedWorkouts.some(sw => sw.id === workout.id);
+        const addButtonText = isInPlan ? 'Added to Plan' : 'Add to Plan';
+        const addButtonClass = isInPlan ? 'secondary-btn disabled' : 'primary-btn';
+        const addButtonIcon = isInPlan ? 'fa-check' : 'fa-plus';
+        const delay = index * 0.1;
+
+        const workoutItem = document.createElement("div");
+        workoutItem.classList.add("workout-item");
+        workoutItem.style.animationDelay = `${delay}s`;
+
+        let actionsHTML = '';
+        if (isInPlan) {
+            actionsHTML = `
+                <div class="workout-actions">
+                    <button class="btn ${addButtonClass} add-btn" disabled>
+                        <i class="fas ${addButtonIcon}"></i> ${addButtonText}
+                    </button>
+                    <button onclick="showVideo(${workout.id})" class="btn secondary-btn video-btn">
+                        <i class="fas fa-play-circle"></i> Watch Video
+                    </button>
+                </div>
+            `;
+        } else {
+            actionsHTML = `
+                <div class="workout-actions">
+                    <button onclick="addToWorkoutPlan(${workout.id})" class="btn ${addButtonClass} add-btn">
+                        <i class="fas ${addButtonIcon}"></i> ${addButtonText}
+                    </button>
+                </div>
+            `;
+        }
+
+        workoutItem.innerHTML = `
+            <div class="workout-header">
+                <h3>${workout.title}</h3>
+                <span class="difficulty-badge ${difficultyClass}">${workout.difficulty}</span>
+            </div>
+            <div class="workout-meta">
+                <span><i class="fas fa-clock"></i> ${workout.duration} min</span>
+            </div>
+            <p class="workout-description">${workout.description}</p>
+            ${actionsHTML}
+        `;
+        workoutList.appendChild(workoutItem);
+    });
+}
+
+function addToWorkoutPlan(workoutId) {
+    const button = document.querySelector(`button[onclick="addToWorkoutPlan(${workoutId})"]`);
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    button.disabled = true;
+
+    fetch('/save-workout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workout_id: workoutId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const workout = currentWorkouts.find(w => w.id === workoutId);
+        if (workout) {
+            savedWorkouts.push(workout);
+            localStorage.setItem('savedWorkouts', JSON.stringify(savedWorkouts));
+            updateMyWorkoutsList();
+            refreshWorkoutDisplay();
+            updateGoToDashboardButton();
+            showNotification('Workout added to your plan!', 'success');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving workout:', error);
+        button.innerHTML = originalText;
+        button.disabled = false;
+        showNotification('Failed to add workout to plan. Please try again.', 'error');
+    });
+}
+
+function removeFromWorkoutPlan(workoutId) {
+    const workoutItem = document.querySelector(`.my-workout-item[data-workout-id="${workoutId}"]`);
+    if (workoutItem) {
+        workoutItem.classList.add('removing');
+    }
+    fetch('/remove-workout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workout_id: workoutId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        savedWorkouts = savedWorkouts.filter(sw => sw.id !== workoutId);
+        localStorage.setItem('savedWorkouts', JSON.stringify(savedWorkouts));
+        updateMyWorkoutsList();
+        refreshWorkoutDisplay();
+        updateGoToDashboardButton();
+        showNotification('Workout removed from your plan', 'info');
+    })
+    .catch(error => {
+        console.error('Error removing workout:', error);
+        showNotification('Failed to remove workout from plan', 'error');
+        if (workoutItem) {
+            workoutItem.classList.remove('removing');
+        }
+    });
+}
+
+function updateMyWorkoutsList() {
+    const myWorkoutsList = document.getElementById('my-workouts-list');
+    const emptyState = document.getElementById('my-workouts-empty');
+    const scheduleAllBtn = document.getElementById('schedule-all-btn');
+
+    if (savedWorkouts.length === 0) {
+        myWorkoutsList.innerHTML = '';
+        emptyState.style.display = 'flex';
+        scheduleAllBtn.disabled = true;
+        return;
+    }
+
+    emptyState.style.display = 'none';
+    scheduleAllBtn.disabled = false;
+    myWorkoutsList.innerHTML = '';
+
+    savedWorkouts.forEach((workout, index) => {
+        let difficultyClass = '';
+        if (workout.difficulty === 'Beginner') difficultyClass = 'difficulty-beginner';
+        else if (workout.difficulty === 'Intermediate') difficultyClass = 'difficulty-intermediate';
+        else if (workout.difficulty === 'Advanced') difficultyClass = 'difficulty-advanced';
+
+        const workoutItem = document.createElement('div');
+        workoutItem.classList.add('my-workout-item');
+        workoutItem.dataset.workoutId = workout.id;
+        workoutItem.style.animationDelay = `${index * 0.05}s`;
+
+        const isScheduled = workout.scheduled_date !== null;
+        const scheduleDate = isScheduled ? new Date(workout.scheduled_date).toLocaleDateString() : null;
+        const scheduleBadge = isScheduled ?
+            `<div class="schedule-badge"><i class="fas fa-calendar-check"></i> ${scheduleDate}</div>` : '';
+
+        workoutItem.innerHTML = `
+            <div class="my-workout-header">
+                <h3>${workout.title}</h3>
+                <span class="difficulty-badge small ${difficultyClass}">${workout.difficulty}</span>
+            </div>
+            <div class="my-workout-meta">
+                <span><i class="fas fa-clock"></i> ${workout.duration} min</span>
+                ${scheduleBadge}
+            </div>
+            <div class="my-workout-actions">
+                <button onclick="showVideo(${workout.id})" class="action-btn video-action" title="Watch Video">
+                    <i class="fas fa-play-circle"></i>
+                </button>
+                <button onclick="scheduleWorkout(${workout.id}, '${workout.title}')" class="action-btn schedule-action" title="Schedule Workout">
+                    <i class="fas fa-calendar-plus"></i>
+                </button>
+                <button onclick="removeFromWorkoutPlan(${workout.id})" class="action-btn remove-action" title="Remove from Plan">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+        myWorkoutsList.appendChild(workoutItem);
+    });
+}
+
+function refreshWorkoutDisplay() {
+    displayWorkouts(currentWorkouts);
+}
+
+function showVideo(workoutId) {
+    const workout = savedWorkouts.find(w => w.id === workoutId) ||
+                    currentWorkouts.find(w => w.id === workoutId);
+
+    if (!workout || !workout.video_url) {
+        showNotification('Video not available for this workout', 'error');
+        return;
+    }
+
+    document.getElementById('video-title').textContent = workout.title;
+    document.getElementById('video-description').textContent = workout.description;
+    document.getElementById('video-container').innerHTML = `
+        <iframe
+            width="100%"
+            height="100%"
+            src="${workout.video_url}"
+            title="${workout.title}"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+        </iframe>
+    `;
+
+
+
+    const modal = document.getElementById('video-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('visible');
+    }, 10);
+}
+
+function closeVideoModal() {
+    const modal = document.getElementById('video-modal');
+    modal.classList.remove('visible');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.getElementById('video-container').innerHTML = '';
+    }, 300);
+}
+
+function scheduleWorkout(workoutId, workoutTitle) {
+    document.getElementById('schedule-workout-id').value = workoutId;
+    document.getElementById('schedule-workout-title').textContent = workoutTitle;
+
+    const modal = document.getElementById('schedule-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('visible');
+    }, 10);
+}
+
+function closeScheduleModal() {
+    const modal = document.getElementById('schedule-modal');
+    modal.classList.remove('visible');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+}
+
+function confirmScheduleWorkout() {
+    const workoutId = document.getElementById('schedule-workout-id').value;
+    const scheduledDate = document.getElementById('schedule-date').value;
+    const confirmBtn = document.querySelector('#schedule-modal .primary-btn');
+    const originalText = confirmBtn.textContent;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scheduling...';
+    confirmBtn.disabled = true;
+
+    fetch('/schedule-workout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            workout_id: workoutId,
+            scheduled_date: scheduledDate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        closeScheduleModal();
+        const workout = savedWorkouts.find(w => w.id === parseInt(workoutId));
+        if (workout) {
+            workout.scheduled_date = scheduledDate;
+        }
+        updateMyWorkoutsList();
+        showNotification(data.message || 'Workout scheduled successfully!', 'success');
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
+    })
+    .catch(error => {
+        console.error('Error scheduling workout:', error);
+        showNotification('Failed to schedule workout', 'error');
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
+    });
+}
+
+function scheduleAllWorkouts() {
+    const modal = document.getElementById('schedule-all-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('visible');
+    }, 10);
+}
+
+function closeScheduleAllModal() {
+    const modal = document.getElementById('schedule-all-modal');
+    modal.classList.remove('visible');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+}
+
+function getNextDate(startDate, index, pattern) {
+    const date = new Date(startDate);
+    switch(pattern) {
+        case 'consecutive':
+            date.setDate(date.getDate() + index);
+            break;
+        case 'alternate':
+            date.setDate(date.getDate() + (index * 2));
+            break;
+        case 'weekdays':
+            let daysToAdd = index;
+            let currentDay = date.getDay();
+            for (let i = 0; i < daysToAdd; i++) {
+                date.setDate(date.getDate() + 1);
+                currentDay = date.getDay();
+                if (currentDay === 0 || currentDay === 6) {
+                    i--;
+                }
+            }
+            break;
+    }
+    return date.toISOString().split('T')[0];
+}
+
+function confirmScheduleAllWorkouts() {
+    if (savedWorkouts.length === 0) {
+        showNotification('No workouts to schedule. Add workouts to your plan first.', 'error');
+        return;
+    }
+    const startDate = document.getElementById('schedule-all-date').value;
+    const pattern = document.querySelector('input[name="schedule-pattern"]:checked').value;
+    const confirmBtn = document.querySelector('#schedule-all-modal .primary-btn');
+    const originalText = confirmBtn.textContent;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scheduling...';
+    confirmBtn.disabled = true;
+
+    const schedulingPromises = savedWorkouts.map((workout, index) => {
+        const scheduledDate = getNextDate(startDate, index, pattern);
+        return fetch('/schedule-workout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                workout_id: workout.id,
+                scheduled_date: scheduledDate
+            })
+        });
+    });
+
+    Promise.all(schedulingPromises)
+        .then(responses => Promise.all(responses.map(res => res.json())))
+        .then(results => {
+            closeScheduleAllModal();
+            savedWorkouts.forEach((workout, index) => {
+                workout.scheduled_date = getNextDate(startDate, index, pattern);
+            });
+            updateMyWorkoutsList();
+            showNotification('All workouts scheduled successfully!', 'success');
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
+            setTimeout(() => {
+                if (confirm('All workouts have been scheduled. Would you like to view your final schedule?')) {
+                    goToDashboard();
+                }
+            }, 1000);
+        })
+        .catch(error => {
+            console.error('Error scheduling workouts:', error);
+            showNotification('Failed to schedule all workouts', 'error');
+            confirmBtn.innerHTML = originalText;
+            confirmBtn.disabled = false;
+        });
+}
+
+function clearAllWorkouts() {
+    if (savedWorkouts.length === 0) return;
+    if (!confirm('Are you sure you want to remove all workouts from your plan?')) {
+        return;
+    }
+    fetch('/clear-workout-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    })
+    .then(response => response.json())
+    .then(data => {
+        savedWorkouts = [];
+        localStorage.removeItem('savedWorkouts');
+        updateMyWorkoutsList();
+        refreshWorkoutDisplay();
+        updateGoToDashboardButton();
+        showNotification('All workouts removed from your plan', 'info');
+    })
+    .catch(error => {
+        console.error('Error clearing workout plan:', error);
+        showNotification('Failed to clear workout plan', 'error');
+    });
+}
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Diet Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v={{ time.time() }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Additional styles for dietary requirements display */
+        .checkbox-list {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 5px;
+            margin-bottom: 15px;
+            background-color: rgba(46, 23, 36, 0.5);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .checkbox-item:hover {
+            background-color: rgba(198, 172, 72, 0.15);
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: #C6AC48;
+            width: 16px;
+            height: 16px;
+        }
+
+        .checkbox-label {
+            color: #f0f0f0;
+            font-size: 0.95rem;
+        }
+
+        /* Hide any leftover references to priority if necessary (not strictly needed if we remove the markup) */
+        .diet-priority-dropdown {
+            display: none; /* Just in case, but we've removed the markup anyway */
+        }
+
+        .diet-search-container {
+            position: relative;
+            width: 100%;
+            max-width: 300px;
+            margin: 10px 0;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 10px 40px 10px 15px;
+            border-radius: 8px;
+            border: 1px solid #3A2831;
+            background-color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(198, 172, 72, 0.5);
+            border-color: #C6AC48;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+        }
+
+        .diet-list-header {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .no-diet-results {
+            width: 100%;
+            text-align: center;
+            padding: 30px;
+            background-color: rgba(58, 40, 49, 0.3);
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .no-diet-results i {
+            font-size: 36px;
+            color: #C6AC48;
+            margin-bottom: 10px;
+        }
+
+        .no-diet-results p {
+            color: #f0f0f0;
+            margin-bottom: 15px;
+        }
+
+        /* Highlight search terms in results */
+        .highlight-match {
+            background-color: rgba(198, 172, 72, 0.3);
+            padding: 0 2px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <header class="portal-header">
+        <h1>Welcome, <span class="highlight">{{ user.full_name }}</span></h1>
+        <nav class="nav-menu">
+            <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+            <a href="{{ url_for('workout_finder') }}" class="nav-link">Create Workout Plan</a>
+            <a href="{{ url_for('diet_management') }}" class="nav-link active">Diet</a>
+        </nav>
+        <button class="btn logout-btn" onclick="window.location.href='{{ url_for('logout') }}'">Logout</button>
+    </header>
+
+    <div class="diet-management-container">
+        <!-- Side Panel: Filters and Current Diet -->
+        <aside class="diet-sidebar">
+            <div class="diet-section">
+                <h2 class="section-title">Your <span class="highlight">Diet Plan</span></h2>
+                <div id="current-diet-panel" class="current-diet-panel">
+                    <!-- Will be populated with user's current diet -->
+                    <div class="empty-diet-state">
+                        <i class="fas fa-utensils"></i>
+                        <p>You haven't saved a diet plan yet.</p>
+                        <p class="small-text">Browse the recommended diets and select one that matches your goals.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="diet-section filter-section">
+                <h2 class="section-title">Find <span class="highlight">Diets</span></h2>
+
+                <!-- REMOVED the Fitness Priority filter block -->
+
+                <!-- Only the Dietary Requirements Filter -->
+                <div class="filter-group">
+                    <h3 class="filter-subtitle">Dietary Requirements</h3>
+                    <div class="checkbox-list">
+                        {% if dietary_tags and dietary_tags|length > 0 %}
+                            {% for tag in dietary_tags %}
+                            <label class="checkbox-item">
+                                <input type="checkbox" name="diet-tags" value="{{ tag.id }}">
+                                <span class="checkbox-label">{{ tag.name }}</span>
+                            </label>
+                            {% endfor %}
+                        {% else %}
+                            <div class="no-tags-message">
+                                <p>No dietary requirements available</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Filter Actions -->
+                <div class="filter-actions">
+                    <button class="btn primary-btn" onclick="applyDietFilters()">
+                        <i class="fas fa-filter"></i> Apply Filters
+                    </button>
+                    <button class="btn secondary-btn" onclick="resetDietFilters()">
+                        <i class="fas fa-undo"></i> Reset
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Diet List Section -->
+        <main class="diet-list-section">
+            <div class="diet-list-header">
+                <h2 class="section-title">Recommended <span class="highlight">Diets</span></h2>
+                <div class="diet-search-container">
+                    <input type="text" id="diet-search" placeholder="Search diets..." class="search-input">
+                    <i class="fas fa-search search-icon"></i>
+                </div>
+                <div id="diet-result-count" class="result-count">0 diets found</div>
+            </div>
+
+            <!-- Loading Indicator -->
+            <div id="diet-loading" class="loading-indicator">
+                <div class="spinner"></div>
+                <p>Loading diets...</p>
+            </div>
+
+            <!-- Diet List -->
+            <div id="diet-list" class="diet-list">
+                <!-- Dynamically populated diets -->
+            </div>
+        </main>
+
+        <!-- Detailed Diet View (initially hidden) -->
+        <div id="detailed-diet-view" class="detailed-diet-view">
+            <!-- Content will be populated dynamically when viewing a meal plan -->
+        </div>
+    </div>
+
+    <!-- Notification Component -->
+    <div id="notification" class="notification">
+        <div class="notification-content">
+            <i class="fas fa-check-circle"></i>
+            <span id="notification-message">Notification message</span>
+        </div>
+        <button onclick="dismissNotification()" class="notification-close">&times;</button>
+    </div>
+
+    <!-- PDF Download Form (hidden, used for direct download) -->
+    <form id="pdf-download-form" method="get" action="" style="display:none;"></form>
+
+    <script>
+    let diets = [];
+    let currentDiet = null;
+    let notificationTimeout = null;
+
+    document.addEventListener("DOMContentLoaded", function() {
+        console.log("Dietary tags: ", {{ dietary_tags|tojson|safe }});
+        applyDietFilters();
+        loadCurrentDiet();
+        initializeTooltips();
+        const searchInput = document.getElementById('diet-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                filterDietsBySearch(this.value.trim().toLowerCase());
+            });
+        }
+    });
+
+    function initializeTooltips() {
+        document.querySelectorAll('.diet-tag').forEach(tag => {
+            tag.addEventListener('mouseenter', showTooltip);
+            tag.addEventListener('mouseleave', hideTooltip);
+        });
+    }
+
+    function showTooltip(e) {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        tooltip.textContent = e.target.getAttribute('data-description') || e.target.textContent;
+        tooltip.style.top = (e.target.offsetTop - 10) + 'px';
+        tooltip.style.left = (e.target.offsetLeft + e.target.offsetWidth + 10) + 'px';
+        document.body.appendChild(tooltip);
+        setTimeout(() => tooltip.classList.add('visible'), 10);
+    }
+
+    function hideTooltip() {
+        const tooltip = document.querySelector('.tooltip.visible');
+        if (tooltip) {
+            tooltip.classList.remove('visible');
+            setTimeout(() => tooltip.remove(), 300);
+        }
+    }
+
+    function showLoading(show) {
+        const loading = document.getElementById('diet-loading');
+        const list = document.getElementById('diet-list');
+        if (show) {
+            loading.style.display = 'flex';
+            list.style.opacity = '0.3';
+        } else {
+            loading.style.display = 'none';
+            list.style.opacity = '1';
+        }
+    }
+
+    function showNotification(message, type = 'success', duration = 3000) {
+        if (notificationTimeout) {
+            clearTimeout(notificationTimeout);
+        }
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.getElementById('notification-message');
+        const icon = notification.querySelector('i');
+        notificationMessage.textContent = message;
+        notification.className = 'notification ' + type;
+        if (type === 'success') {
+            icon.className = 'fas fa-check-circle';
+        } else if (type === 'error') {
+            icon.className = 'fas fa-exclamation-circle';
+        } else if (type === 'info') {
+            icon.className = 'fas fa-info-circle';
+        }
+        notification.classList.add('visible');
+        notificationTimeout = setTimeout(() => {
+            dismissNotification();
+        }, duration);
+    }
+
+    function dismissNotification() {
+        const notification = document.getElementById('notification');
+        notification.classList.remove('visible');
+    }
+
+    function applyDietFilters() {
+        showLoading(true);
+        const tagValues = Array.from(document.querySelectorAll('input[name="diet-tags"]:checked'))
+                               .map(cb => cb.value);
+
+        console.log("Applying filters with dietary tags:", tagValues);
+
+        fetch('/filter-diets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tags: tagValues })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            console.log("Filter response:", data);
+            if (!data.diets) {
+                throw new Error('No "diets" field in response');
+            }
+            diets = data.diets;
+            displayDiets(diets);
+            showLoading(false);
+        })
+        .catch(error => {
+            console.error('Error loading diets:', error);
+            showNotification('Failed to load diets', 'error');
+            showLoading(false);
+        });
+    }
+
+    function resetDietFilters() {
+        document.querySelectorAll('input[name="diet-tags"]').forEach(cb => {
+            cb.checked = false;
+        });
+        applyDietFilters();
+        showNotification('Diet filters have been reset', 'info');
+    }
+
+    function logMealPlanData(mealPlan) {
+        console.log("Meal Plan Data:", mealPlan);
+        if (mealPlan) {
+            console.log("Breakfast:", mealPlan.breakfast);
+            console.log("Lunch:", mealPlan.lunch);
+            console.log("Dinner:", mealPlan.dinner);
+            console.log("Snacks:", mealPlan.snacks);
+        } else {
+            console.log("No meal plan data available");
+        }
+    }
+
+    function loadCurrentDiet() {
+        fetch('/get-saved-diets')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Current diet response:", data);
+                if (data.diets && data.diets.length > 0) {
+                    currentDiet = data.diets[0];
+                    logMealPlanData(currentDiet.meal_plan);
+
+                    displayCurrentDiet(currentDiet);
+                } else {
+                    displayEmptyDietState();
+                }
+            })
+            .catch(error => {
+                console.error('Error loading current diet:', error);
+                displayEmptyDietState();
+            });
+    }
+
+    function displayEmptyDietState() {
+        const currentDietPanel = document.getElementById('current-diet-panel');
+        currentDietPanel.innerHTML = `
+            <div class="empty-diet-state">
+                <i class="fas fa-utensils"></i>
+                <p>You haven't saved a diet plan yet.</p>
+                <p class="small-text">Browse the recommended diets and select one that matches your goals.</p>
+            </div>
+        `;
+    }
+
+    function displayCurrentDiet(diet) {
+        const currentDietPanel = document.getElementById('current-diet-panel');
+        let tagsHTML = '';
+        if (diet.tags && diet.tags.length > 0) {
+            tagsHTML = diet.tags.map(t => `<span class="diet-tag">${t}</span>`).join('');
+        }
+        let mealPlanSummary = '';
+        if (diet.meal_plan) {
+            const numBreakfast = diet.meal_plan.breakfast ? diet.meal_plan.breakfast.length : 0;
+            const numLunch = diet.meal_plan.lunch ? diet.meal_plan.lunch.length : 0;
+            const numDinner = diet.meal_plan.dinner ? diet.meal_plan.dinner.length : 0;
+            const numSnacks = diet.meal_plan.snacks ? diet.meal_plan.snacks.length : 0;
+
+            mealPlanSummary = `
+                <div class="meal-plan-summary">
+                    <div class="meal-summary-item">
+                        <i class="fas fa-sun"></i>
+                        <span>${numBreakfast} breakfast option${numBreakfast !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="meal-summary-item">
+                        <i class="fas fa-cloud-sun"></i>
+                        <span>${numLunch} lunch option${numLunch !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="meal-summary-item">
+                        <i class="fas fa-moon"></i>
+                        <span>${numDinner} dinner option${numDinner !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="meal-summary-item">
+                        <i class="fas fa-cookie"></i>
+                        <span>${numSnacks} snack option${numSnacks !== 1 ? 's' : ''}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        currentDietPanel.innerHTML = `
+            <div class="current-diet-card">
+                <div class="current-diet-header">
+                    <h3>${diet.name}</h3>
+                    <span class="diet-card-calories">${diet.calories} kcal</span>
+                </div>
+
+                <div class="current-diet-tags">
+                    ${tagsHTML}
+                </div>
+
+                <p class="current-diet-description">${diet.description}</p>
+
+                ${mealPlanSummary}
+
+                <div class="current-diet-actions">
+                    <button class="btn primary-btn" onclick="viewCurrentDietPlan()">
+                        <i class="fas fa-list-ul"></i> View Full Plan
+                    </button>
+                    <button class="btn primary-btn" onclick="downloadDietPDF(${diet.id})">
+                        <i class="fas fa-file-download"></i> Download PDF
+                    </button>
+                    <button class="btn secondary-btn" onclick="removeDiet(${diet.id})">
+                        <i class="fas fa-trash"></i> Remove Diet
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    function displayDiets(dietsArray) {
+        const dietList = document.getElementById('diet-list');
+        const resultCount = document.getElementById('diet-result-count');
+        dietList.innerHTML = '';
+
+        if (dietsArray.length === 0) {
+            dietList.innerHTML = `
+                <div class="no-results">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>No diets found for your current filters.</p>
+                    <p>Try different filter options or <button onclick="resetDietFilters()" class="btn text-btn">reset filters</button>.</p>
+                </div>`;
+            resultCount.textContent = "0 diets found";
+            return;
+        }
+
+        resultCount.textContent = `${dietsArray.length} diet${dietsArray.length === 1 ? '' : 's'} found`;
+
+        dietsArray.forEach((diet, index) => {
+            const delay = index * 0.1;
+            const dietCard = document.createElement('div');
+            dietCard.classList.add('diet-card');
+            dietCard.style.animationDelay = `${delay}s`;
+            const isSaved = currentDiet && currentDiet.id === diet.id;
+            const saveButtonText = isSaved ? '<i class="fas fa-check"></i> Current Diet' : '<i class="fas fa-plus"></i> Set as My Diet';
+            const saveButtonClass = isSaved ? 'secondary-btn disabled' : 'primary-btn';
+            const saveButtonAttr = isSaved ? 'disabled' : `onclick="saveDiet(${diet.id})"`;
+            let tagsHTML = '';
+            if (diet.tags && diet.tags.length > 0) {
+                tagsHTML = diet.tags.map(t => `<span class="diet-tag">${t}</span>`).join('');
+            }
+
+            dietCard.innerHTML = `
+                <div class="diet-card-header">
+                    <div class="diet-card-info">
+                        <h3>${diet.name}</h3>
+                        <span class="diet-card-calories">${diet.calories} kcal</span>
+                    </div>
+                    <div class="diet-tags-container">${tagsHTML}</div>
+                </div>
+                <p class="diet-card-description">${diet.description}</p>
+                ${diet.image_url ? `<img src="${diet.image_url}" alt="${diet.name}" class="diet-image">` : ''}
+                <div class="diet-card-actions">
+                    <button class="btn ${saveButtonClass}" ${saveButtonAttr}>
+                        ${saveButtonText}
+                    </button>
+                    ${isSaved ? `
+                    <button class="btn secondary-btn" onclick="viewCurrentDietPlan()">
+                        <i class="fas fa-eye"></i> View Plan
+                    </button>
+                    ` : ''}
+                </div>
+            `;
+
+            dietList.appendChild(dietCard);
+        });
+        initializeTooltips();
+    }
+
+    function viewCurrentDietPlan() {
+        if (!currentDiet) {
+            showNotification('No diet selected', 'error');
+            return;
+        }
+        logMealPlanData(currentDiet.meal_plan);
+        const detailedView = document.getElementById('detailed-diet-view');
+        const tagsHTML = currentDiet.tags && currentDiet.tags.length > 0
+            ? currentDiet.tags.map(tag => `<span class="diet-tag">${tag}</span>`).join('')
+            : '';
+        let breakfastHTML, lunchHTML, dinnerHTML, snacksHTML;
+
+        if (currentDiet.meal_plan) {
+            breakfastHTML = generateMealListHTML(currentDiet.meal_plan.breakfast || [], 'Breakfast', 'fas fa-sun');
+            lunchHTML = generateMealListHTML(currentDiet.meal_plan.lunch || [], 'Lunch', 'fas fa-cloud-sun');
+            dinnerHTML = generateMealListHTML(currentDiet.meal_plan.dinner || [], 'Dinner', 'fas fa-moon');
+            snacksHTML = generateMealListHTML(currentDiet.meal_plan.snacks || [], 'Snacks', 'fas fa-cookie');
+        } else {
+            breakfastHTML = generateMealListHTML([], 'Breakfast', 'fas fa-sun');
+            lunchHTML = generateMealListHTML([], 'Lunch', 'fas fa-cloud-sun');
+            dinnerHTML = generateMealListHTML([], 'Dinner', 'fas fa-moon');
+            snacksHTML = generateMealListHTML([], 'Snacks', 'fas fa-cookie');
+        }
+
+        detailedView.innerHTML = `
+            <div class="detailed-diet-header">
+                <h2>${currentDiet.name}</h2>
+                <button class="btn icon-btn close-detailed-view" onclick="closeDetailedView()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="detailed-diet-content">
+                <div class="diet-overview">
+                    <div class="diet-overview-item">
+                        <span class="label">Total Calories:</span>
+                        <span class="value">${currentDiet.calories} kcal</span>
+                    </div>
+                    <div class="diet-overview-tags">
+                        ${tagsHTML}
+                    </div>
+                    <p class="diet-description">${currentDiet.description}</p>
+                </div>
+
+                <div class="meal-plan-container">
+                    <h3>Full Meal Plan</h3>
+                    ${breakfastHTML}
+                    ${lunchHTML}
+                    ${dinnerHTML}
+                    ${snacksHTML}
+                </div>
+
+                <div class="plan-actions">
+                    <button class="btn primary-btn" onclick="downloadDietPDF(${currentDiet.id})">
+                        <i class="fas fa-file-download"></i> Download PDF
+                    </button>
+                </div>
+            </div>
+        `;
+
+        detailedView.classList.add('active');
+        document.body.classList.add('detailed-view-open');
+    }
+
+    function generateMealListHTML(mealItems, title, iconClass) {
+        let defaultItems;
+
+        if (currentDiet) {
+            if (currentDiet.name.includes("High Protein")) {
+                defaultItems = {
+                    'Breakfast': [
+                        "Protein pancakes with banana (420 kcal)",
+                        "Greek yogurt with berries and nuts (320 kcal)",
+                        "6 egg whites with spinach and turkey bacon (380 kcal)"
+                    ],
+                    'Lunch': [
+                        "Grilled chicken breast with quinoa (550 kcal)",
+                        "Tuna salad with mixed greens (480 kcal)",
+                        "Turkey and avocado wrap (520 kcal)"
+                    ],
+                    'Dinner': [
+                        "Baked salmon with sweet potato (620 kcal)",
+                        "Lean beef stir fry with vegetables (580 kcal)",
+                        "Grilled steak with roasted vegetables (650 kcal)"
+                    ],
+                    'Snacks': [
+                        "Greek yogurt with honey (150 kcal)",
+                        "Protein bar (200 kcal)",
+                        "Hard-boiled eggs (140 kcal)"
+                    ]
+                };
+            } else if (currentDiet.name.includes("Calorie Deficit")) {
+                defaultItems = {
+                    'Breakfast': [
+                        "Overnight oats with berries (280 kcal)",
+                        "Egg white omelet with vegetables (220 kcal)",
+                        "Smoothie with spinach and protein powder (250 kcal)"
+                    ],
+                    'Lunch': [
+                        "Grilled chicken salad (320 kcal)",
+                        "Vegetable soup with side salad (280 kcal)",
+                        "Quinoa bowl with roasted vegetables (350 kcal)"
+                    ],
+                    'Dinner': [
+                        "Baked white fish with steamed broccoli (330 kcal)",
+                        "Turkey meatballs with zucchini noodles (370 kcal)",
+                        "Shrimp and vegetable stir fry (340 kcal)"
+                    ],
+                    'Snacks': [
+                        "Apple slices with almond butter (150 kcal)",
+                        "Carrot sticks with hummus (120 kcal)",
+                        "Rice cakes with avocado (140 kcal)"
+                    ]
+                };
+            } else if (currentDiet.name.includes("Mediterranean") || currentDiet.name.includes("Heart-Healthy")) {
+                defaultItems = {
+                    'Breakfast': [
+                        "Greek yogurt with honey and walnuts (320 kcal)",
+                        "Whole grain toast with olive oil and tomatoes (280 kcal)",
+                        "Vegetable frittata with feta cheese (330 kcal)"
+                    ],
+                    'Lunch': [
+                        "Mediterranean salad with chickpeas and olives (420 kcal)",
+                        "Grilled fish with lemon and herbs (380 kcal)",
+                        "Whole grain pita with hummus and vegetables (410 kcal)"
+                    ],
+                    'Dinner': [
+                        "Eggplant moussaka (480 kcal)",
+                        "Grilled chicken with roasted Mediterranean vegetables (450 kcal)",
+                        "Baked cod with tomato and olive sauce (420 kcal)"
+                    ],
+                    'Snacks': [
+                        "Handful of almonds (160 kcal)",
+                        "Fresh fruit (100 kcal)",
+                        "Olives (70 kcal)"
+                    ]
+                };
+            } else {
+                defaultItems = {
+                    'Breakfast': [
+                        "Oatmeal with berries and nuts (350 kcal)",
+                        "Greek yogurt with honey (150 kcal)",
+                        "Whole grain toast with avocado (280 kcal)"
+                    ],
+                    'Lunch': [
+                        "Grilled chicken salad with olive oil dressing (450 kcal)",
+                        "Whole grain bread (120 kcal)",
+                        "Fresh fruit (80 kcal)"
+                    ],
+                    'Dinner': [
+                        "Baked salmon with herbs (300 kcal)",
+                        "Steamed vegetables (150 kcal)",
+                        "Brown rice or quinoa (200 kcal)"
+                    ],
+                    'Snacks': [
+                        "Handful of mixed nuts (200 kcal)",
+                        "Apple or other seasonal fruit (100 kcal)"
+                    ]
+                };
+            }
+        } else {
+            defaultItems = {
+                'Breakfast': ["Oatmeal with berries and nuts (350 kcal)"],
+                'Lunch': ["Grilled chicken salad with olive oil dressing (450 kcal)"],
+                'Dinner': ["Baked salmon with herbs (300 kcal)"],
+                'Snacks': ["Handful of mixed nuts (200 kcal)"]
+            };
+        }
+
+        const items = mealItems && mealItems.length > 0 ? mealItems : defaultItems[title];
+
+        return `
+            <div class="meal-section">
+                <h4><i class="${iconClass}"></i> ${title}</h4>
+                <ul class="meal-list">
+                    ${items.map(item => `<li>${item}</li>`).join('')}
+                </ul>
+            </div>
+        `;
+    }
+
+    function closeDetailedView() {
+        const detailedView = document.getElementById('detailed-diet-view');
+        detailedView.classList.remove('active');
+        document.body.classList.remove('detailed-view-open');
+    }
+
+    function downloadDietPDF(dietId) {
+        showNotification('Preparing your PDF...', 'info');
+        window.location.href = `/download-diet-pdf/${dietId}`;
+    }
+
+    function removeDiet(dietId) {
+        if (confirm('Are you sure you want to remove this diet?')) {
+            fetch('/remove-diet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ diet_id: dietId })
+            })
+            .then(response => response.json())
+            .then(data => {
+                showNotification('Diet removed successfully', 'success');
+                currentDiet = null;
+                displayEmptyDietState();
+                refreshDietsList();
+            })
+            .catch(error => {
+                console.error('Error removing diet:', error);
+                showNotification('Failed to remove diet', 'error');
+            });
+        }
+    }
+
+    function refreshDietsList() {
+        applyDietFilters();
+    }
+
+    function saveDiet(dietId) {
+        const button = document.querySelector(`button[onclick="saveDiet(${dietId})"]`);
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        button.disabled = true;
+
+        fetch('/save-diet', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ diet_id: dietId })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            button.innerHTML = '<i class="fas fa-check"></i> Current Diet';
+            button.classList.remove('primary-btn');
+            button.classList.add('secondary-btn', 'disabled');
+            button.disabled = true;
+
+            showNotification('Diet saved as your current plan', 'success');
+
+            const savedDiet = diets.find(d => d.id === dietId);
+            if (savedDiet) {
+                loadCurrentDiet();
+
+                setTimeout(() => {
+                    refreshDietsList();
+                }, 500);
+            }
+        })
+        .catch(error => {
+            console.error('Error saving diet:', error);
+            showNotification('Failed to save diet', 'error');
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        });
+    }
+
+    function filterDietsBySearch(searchTerm) {
+        const dietCards = document.querySelectorAll('.diet-card');
+
+        if (!searchTerm) {
+            dietCards.forEach(card => {
+                card.style.display = 'block';
+                removeHighlighting(card);
+            });
+            document.getElementById('diet-result-count').textContent =
+                `${dietCards.length} diet${dietCards.length === 1 ? '' : 's'} found`;
+            const noResults = document.querySelector('.no-diet-results');
+            if (noResults) {
+                noResults.remove();
+            }
+            return;
+        }
+
+        let foundCount = 0;
+        dietCards.forEach(card => {
+            const title = card.querySelector('h3').textContent.toLowerCase();
+            const description = card.querySelector('.diet-card-description').textContent.toLowerCase();
+            const calories = card.querySelector('.diet-card-calories').textContent.toLowerCase();
+
+            const tagsContainer = card.querySelector('.diet-tags-container');
+            let tagsText = '';
+            if (tagsContainer) {
+                const tags = tagsContainer.querySelectorAll('.diet-tag');
+                tagsText = Array.from(tags).map(tag => tag.textContent.toLowerCase()).join(' ');
+            }
+            if (title.includes(searchTerm) ||
+                description.includes(searchTerm) ||
+                calories.includes(searchTerm) ||
+                tagsText.includes(searchTerm)) {
+
+                card.style.display = 'block';
+                foundCount++;
+                highlightMatches(card, searchTerm);
+
+            } else {
+                card.style.display = 'none';
+                removeHighlighting(card);
+            }
+        });
+        document.getElementById('diet-result-count').textContent =
+            `${foundCount} diet${foundCount === 1 ? '' : 's'} found`;
+
+        const dietList = document.getElementById('diet-list');
+        if (foundCount === 0) {
+            let noResults = document.querySelector('.no-diet-results');
+            if (!noResults) {
+                noResults = document.createElement('div');
+                noResults.className = 'no-diet-results';
+                noResults.innerHTML = `
+                    <i class="fas fa-search"></i>
+                    <p>No diets found matching "${searchTerm}"</p>
+                    <button class="btn secondary-btn" onclick="clearDietSearch()">
+                        <i class="fas fa-times"></i> Clear Search
+                    </button>
+                `;
+                dietList.appendChild(noResults);
+            }
+        } else {
+            const noResults = document.querySelector('.no-diet-results');
+            if (noResults) {
+                noResults.remove();
+            }
+        }
+    }
+
+    function highlightMatches(card, searchTerm) {
+        removeHighlighting(card);
+
+        const elementsToHighlight = [
+            card.querySelector('h3'),
+            card.querySelector('.diet-card-description')
+        ];
+
+        elementsToHighlight.forEach(element => {
+            if (!element) return;
+
+            const content = element.textContent;
+            const regex = new RegExp(searchTerm, 'gi');
+
+            element.innerHTML = content.replace(regex, match => {
+                return `<span class="highlight-match">${match}</span>`;
+            });
+        });
+    }
+
+    function removeHighlighting(card) {
+        const highlightedElements = card.querySelectorAll('.highlight-match');
+        highlightedElements.forEach(el => {
+            const parent = el.parentNode;
+            parent.replaceChild(document.createTextNode(el.textContent), el);
+            parent.normalize();
+        });
+    }
+
+    function clearDietSearch() {
+        const searchInput = document.getElementById('diet-search');
+        if (searchInput) {
+            searchInput.value = '';
+            filterDietsBySearch('');
+        }
+    }
+    </script>
+</body>
+</html>

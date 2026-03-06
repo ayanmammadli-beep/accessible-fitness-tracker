@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitAdapt Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v={{ time.time() }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header class="portal-header">
+        <h1>Welcome, <span class="highlight">{{ user.full_name }}</span></h1>
+        <nav class="nav-menu">
+            <a href="{{ url_for('dashboard') }}" class="nav-link active">Dashboard</a>
+            <a href="{{ url_for('workout_finder') }}" class="nav-link">Create Workout Plan</a>
+            <a href="{{ url_for('diet_management') }}" class="nav-link">Diet</a>
+        </nav>
+        <button class="btn logout-btn" onclick="window.location.href='{{ url_for('logout') }}'">Logout</button>
+    </header>
+    <div class="dashboard-main">
+        <div class="streak-card">
+            <div class="streak-info">
+                <h2>Current Streak</h2>
+                <div class="streak-counter" id="streak-counter-display">{{ streak.current_streak }} <span>days</span></div>
+                <p class="streak-subtitle">Your longest streak: <span id="longest-streak-display">{{ streak.longest_streak }}</span> days</p>
+            </div>
+            <div class="streak-icon">
+                <i class="fas fa-fire"></i>
+            </div>
+        </div>
+        <div class="dashboard-section">
+            <div class="section-header">
+                <h2>Your <span class="highlight">Workout Schedule</span></h2>
+                <button class="btn primary-btn" onclick="window.location.href='{{ url_for('workout_finder') }}'">
+                    <i class="fas fa-plus"></i> Add Workouts
+                </button>
+            </div>
+            <div class="calendar-tabs">
+                <button class="calendar-tab active" data-view="week">Week View</button>
+                <button class="calendar-tab" data-view="completed">Completed Workouts</button>
+            </div>
+            <div id="week-view" class="calendar-view active">
+                <div class="week-days">
+                    {% for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] %}
+                    <div class="day-column">
+                        <div class="day-header">
+                            <h3>{{ day }}</h3>
+                            <span class="date-display"></span>
+                        </div>
+                        <div class="day-workouts" data-day="{{ day }}">
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="week-navigation">
+                    <button id="prev-week" class="btn secondary-btn">
+                        <i class="fas fa-chevron-left"></i> Previous Week
+                    </button>
+                    <span id="current-week-display">Current Week</span>
+                    <button id="next-week" class="btn secondary-btn">
+                        Next Week <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="completed-workouts" class="calendar-view">
+                <h2>Completed Workouts (This Week)</h2>
+                <div id="completed-workouts-list" class="completed-workouts-list">
+                </div>
+                <div id="no-completed-workouts" style="display:none; text-align:center; margin-top:20px;">
+                    <i class="fas fa-info-circle"></i>
+                    <p>No workouts completed this week yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="video-modal" class="modal">
+        <div class="modal-content video-modal-content">
+            <div class="modal-header">
+                <h2 id="video-title">Workout Video</h2>
+                <span class="close-modal" onclick="closeVideoModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="video-container" class="video-container">
+                </div>
+                <div class="video-details">
+                    <div id="video-description" class="video-description"></div>
+
+                    <div class="timer-controls">
+                        <div class="timer-display" id="timer-display">
+                            <div class="timer">00:00:00</div>
+                            <div class="timer-buttons">
+                                <button id="timer-start" class="btn small-btn primary-btn">Start</button>
+                                <button id="timer-pause" class="btn small-btn secondary-btn" disabled>Pause</button>
+                                <button id="timer-reset" class="btn small-btn secondary-btn" disabled>Reset</button>
+                            </div>
+                        </div>
+
+                        <div class="workout-actions">
+                            <button id="start-timer-btn" class="btn secondary-btn">
+                                <i class="fas fa-stopwatch"></i> Start Timer
+                            </button>
+                            <button id="improve-workout-btn" class="btn primary-btn">
+                                <i class="fas fa-arrow-up"></i> Improve Workout
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="improve-workout-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Improve Your Workout</h2>
+                <span class="close-modal" onclick="closeImproveModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="improvement-options">
+                    <div class="improvement-option">
+                        <h3>Increase Difficulty</h3>
+                        <p id="current-difficulty">Current: <span>{{ current_workout.difficulty if current_workout else 'N/A' }}</span></p>
+                        <div class="difficulty-selector">
+                            <button class="difficulty-option" data-difficulty="Beginner">Beginner</button>
+                            <button class="difficulty-option" data-difficulty="Intermediate">Intermediate</button>
+                            <button class="difficulty-option" data-difficulty="Advanced">Advanced</button>
+                        </div>
+                    </div>
+
+                    <div class="improvement-option">
+                        <h3>Extend Duration</h3>
+                        <p id="current-duration">Current: <span>{{ current_workout.duration if current_workout else 'N/A' }}</span> minutes</p>
+                        <div class="duration-slider-container">
+                            <input type="range" id="duration-slider" min="10" max="60" step="5" value="20">
+                            <span id="duration-value">20 min</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn secondary-btn" onclick="closeImproveModal()">Cancel</button>
+                    <button class="btn primary-btn" onclick="confirmImproveWorkout()">Improve Workout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="completion-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Complete Workout</h2>
+                <span class="close-modal" onclick="closeCompletionModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="completion-content">
+                    <div class="completion-icon">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3 id="completion-title">How was your workout?</h3>
+                    <p>Mark this workout as completed to track your progress.</p>
+
+                    <div class="workout-rating">
+                        <p>Rate how you felt:</p>
+                        <div class="rating-options">
+                            <div class="rating-option" data-value="1" onclick="selectRating(1)">
+                                <i class="fas fa-tired"></i>
+                                <span>Tough</span>
+                            </div>
+                            <div class="rating-option" data-value="2" onclick="selectRating(2)">
+                                <i class="fas fa-meh"></i>
+                                <span>OK</span>
+                            </div>
+                            <div class="rating-option" data-value="3" onclick="selectRating(3)">
+                                <i class="fas fa-smile"></i>
+                                <span>Good</span>
+                            </div>
+                            <div class="rating-option" data-value="4" onclick="selectRating(4)">
+                                <i class="fas fa-grin-stars"></i>
+                                <span>Great</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="intensity-slider">
+                        <label for="intensity">Workout Intensity</label>
+                        <input type="range" id="intensity" min="1" max="10" value="5">
+                        <div class="intensity-labels">
+                            <span>Easy</span>
+                            <span>Hard</span>
+                        </div>
+                    </div>
+
+                    <div class="completion-notes">
+                        <label for="completion-notes">Notes (optional):</label>
+                        <textarea id="completion-notes" placeholder="How did you feel? Any achievements?"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn secondary-btn" onclick="closeCompletionModal()">Cancel</button>
+                    <button class="btn primary-btn" onclick="confirmCompletionWorkout()">Mark as Completed</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification">
+        <div class="notification-content">
+            <i class="fas fa-check-circle"></i>
+            <span id="notification-message">Notification message</span>
+        </div>
+        <button onclick="dismissNotification()" class="notification-close">&times;</button>
+    </div>
+
+<script>
+let scheduledWorkouts = [];
+let currentWorkout = null;
+let currentWeekStart = new Date();
+let timer = null;
+let timerRunning = false;
+let timerSeconds = 0;
+let totalSeconds = 0;
+let timerInterval = null;
+let selectedRating = 0;
+let notificationTimeout = null;
+
+document.addEventListener("DOMContentLoaded", function() {
+    initializeCurrentWeek();
+    loadScheduledWorkouts();
+    initializeTabs();
+    initializeFilters();
+    initializeWeekNavigation();
+    initializeTimer();
+    initializeImprovementOptions();
+    animateStreakCounter();
+    document.getElementById('intensity').addEventListener('input', updateIntensityLabel);
+});
+
+function updateIntensityLabel() {
+    const value = document.getElementById('intensity').value;
+    const labels = ['Very Easy', 'Easy', 'Fairly Easy', 'Moderate', 'Somewhat Hard',
+                    'Hard', 'Very Hard', 'Very Very Hard', 'Extremely Hard', 'Maximum Effort'];
+    console.log(`Current intensity: ${labels[value-1]}`);
+}
+
+function selectRating(value) {
+    selectedRating = value;
+    document.querySelectorAll('.rating-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    document.querySelector(`.rating-option[data-value="${value}"]`).classList.add('selected');
+}
+
+function showNotification(message, type = 'success', duration = 3000) {
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+    }
+    const notification = document.getElementById('notification');
+    const notificationMessage = document.getElementById('notification-message');
+    const icon = notification.querySelector('i');
+    notificationMessage.textContent = message;
+    notification.className = 'notification ' + type;
+    if (type === 'success') {
+        icon.className = 'fas fa-check-circle';
+    } else if (type === 'error') {
+        icon.className = 'fas fa-exclamation-circle';
+    } else if (type === 'info') {
+        icon.className = 'fas fa-info-circle';
+    }
+    notification.classList.add('visible');
+    notificationTimeout = setTimeout(() => {
+        dismissNotification();
+    }, duration);
+}
+
+function dismissNotification() {
+    const notification = document.getElementById('notification');
+    notification.classList.remove('visible');
+}
+
+function initializeCurrentWeek() {
+    const today = new Date();
+    const day = today.getDay();
+    const daysToSubtract = day === 0 ? 6 : day - 1;
+    currentWeekStart = new Date(today);
+    currentWeekStart.setDate(today.getDate() - daysToSubtract);
+    currentWeekStart.setHours(0, 0, 0, 0);
+    updateWeekDisplay();
+}
+
+function updateWeekDisplay() {
+    const weekEnd = new Date(currentWeekStart);
+    weekEnd.setDate(currentWeekStart.getDate() + 6);
+    const startMonth = currentWeekStart.toLocaleString('default', { month: 'short' });
+    const endMonth = weekEnd.toLocaleString('default', { month: 'short' });
+    const startDay = currentWeekStart.getDate();
+    const endDay = weekEnd.getDate();
+    const year = currentWeekStart.getFullYear();
+    let weekDisplay = "";
+    if (startMonth === endMonth) {
+        weekDisplay = `${startMonth} ${startDay} - ${endDay}, ${year}`;
+    } else {
+        weekDisplay = `${startMonth} ${startDay} - ${endMonth} ${endDay}, ${year}`;
+    }
+    document.getElementById('current-week-display').textContent = weekDisplay;
+    updateWeekDates();
+}
+
+function updateWeekDates() {
+    const dateDisplays = document.querySelectorAll('.date-display');
+    const weekStart = new Date(currentWeekStart);
+    dateDisplays.forEach((display, index) => {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + index);
+        const month = date.toLocaleString('default', { month: 'short' });
+        const day = date.getDate();
+        display.textContent = `${month} ${day}`;
+        const today = new Date();
+        if (date.getDate() === today.getDate() &&
+            date.getMonth() === today.getMonth() &&
+            date.getFullYear() === today.getFullYear()) {
+            display.classList.add('today');
+        } else {
+            display.classList.remove('today');
+        }
+    });
+}
+
+function initializeWeekNavigation() {
+    document.getElementById('prev-week').addEventListener('click', function() {
+        document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+            el.style.opacity = '0';
+        });
+        setTimeout(() => {
+            currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+            updateWeekDisplay();
+            displayScheduledWorkouts();
+            setTimeout(() => {
+                document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+                    el.style.opacity = '1';
+                });
+            }, 50);
+        }, 300);
+    });
+
+    document.getElementById('next-week').addEventListener('click', function() {
+        document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+            el.style.opacity = '0';
+        });
+        setTimeout(() => {
+            currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+            updateWeekDisplay();
+            displayScheduledWorkouts();
+            setTimeout(() => {
+                document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+                    el.style.opacity = '1';
+                });
+            }, 50);
+        }, 300);
+    });
+}
+
+function initializeTabs() {
+    const tabs = document.querySelectorAll('.calendar-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.calendar-view').forEach(view => {
+                view.classList.remove('active');
+            });
+            const view = this.getAttribute('data-view');
+            document.getElementById(view === 'week' ? 'week-view' : 'completed-workouts').classList.add('active');
+            if (view === 'completed') {
+                loadCompletedWorkouts();
+            }
+        });
+    });
+}
+
+function initializeFilters() {
+    const dateFilter = document.getElementById('date-filter');
+    const difficultyFilter = document.getElementById('difficulty-filter');
+    const clearFilters = document.getElementById('clear-filters');
+
+    if (dateFilter) {
+        dateFilter.addEventListener('change', function() {
+            filterWorkouts();
+        });
+    }
+
+    if (difficultyFilter) {
+        difficultyFilter.addEventListener('change', function() {
+            filterWorkouts();
+        });
+    }
+
+    if (clearFilters) {
+        clearFilters.addEventListener('click', function() {
+            if (dateFilter) dateFilter.value = '';
+            if (difficultyFilter) difficultyFilter.value = '';
+            filterWorkouts();
+            showNotification('Filters cleared', 'info');
+        });
+    }
+}
+
+function filterWorkouts() {
+    const dateFilter = document.getElementById('date-filter');
+    const difficultyFilter = document.getElementById('difficulty-filter');
+
+    let dateFilterObj = null;
+    if (dateFilter && dateFilter.value) {
+        dateFilterObj = new Date(dateFilter.value);
+        dateFilterObj.setHours(0, 0, 0, 0);
+    }
+
+    let filteredWorkouts = scheduledWorkouts;
+    if (dateFilterObj) {
+        filteredWorkouts = filteredWorkouts.filter(workout => {
+            if (!workout.scheduled_date) return false;
+            const workoutDate = new Date(workout.scheduled_date + "T00:00:00");
+            workoutDate.setHours(0, 0, 0, 0);
+            return workoutDate.getTime() === dateFilterObj.getTime();
+        });
+    }
+
+    if (difficultyFilter && difficultyFilter.value) {
+        filteredWorkouts = filteredWorkouts.filter(workout =>
+            workout.difficulty === difficultyFilter.value
+        );
+    }
+
+    displayWorkoutsList(filteredWorkouts);
+}
+
+function loadScheduledWorkouts() {
+    fetch('/get-scheduled-workouts')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Loaded scheduled workouts:", data);
+            scheduledWorkouts = data.workouts.map(workout => {
+                if (workout.scheduled_date) {
+                    workout.date_obj = new Date(workout.scheduled_date + "T00:00:00");
+                }
+                return workout;
+            });
+            scheduledWorkouts.sort((a, b) => {
+                if (!a.scheduled_date) return 1;
+                if (!b.scheduled_date) return -1;
+                return a.date_obj - b.date_obj;
+            });
+            displayScheduledWorkouts();
+        })
+        .catch(error => {
+            console.error("Error loading scheduled workouts:", error);
+            showNotification('Failed to load workouts', 'error');
+        });
+}
+
+function displayScheduledWorkouts() {
+    document.querySelectorAll('.day-workouts').forEach(container => {
+        container.innerHTML = '';
+    });
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+        const date = new Date(currentWeekStart);
+        date.setDate(currentWeekStart.getDate() + i);
+        weekDates.push(date);
+    }
+    const weekWorkouts = scheduledWorkouts.filter(workout => {
+        if (!workout.scheduled_date) return false;
+        const workoutDate = workout.date_obj;
+        for (let date of weekDates) {
+            if (workoutDate.getDate() === date.getDate() &&
+                workoutDate.getMonth() === date.getMonth() &&
+                workoutDate.getFullYear() === date.getFullYear()) {
+                return true;
+            }
+        }
+        return false;
+    });
+    weekWorkouts.forEach(workout => {
+        const workoutDate = workout.date_obj;
+        const dayIndex = workoutDate.getDay() === 0 ? 6 : workoutDate.getDay() - 1;
+        const dayContainer = document.querySelectorAll('.day-workouts')[dayIndex];
+        if (!dayContainer) return;
+        const workoutCard = document.createElement('div');
+        workoutCard.classList.add('day-workout-card');
+        workoutCard.dataset.workoutId = workout.id;
+        let difficultyClass = '';
+        if (workout.difficulty === 'Beginner') difficultyClass = 'difficulty-beginner';
+        else if (workout.difficulty === 'Intermediate') difficultyClass = 'difficulty-intermediate';
+        else if (workout.difficulty === 'Advanced') difficultyClass = 'difficulty-advanced';
+        const isCompleted = workout.completed;
+        const completedIcon = isCompleted ?
+            '<div class="completed-indicator"><i class="fas fa-check-circle"></i></div>' : '';
+        const completeButton = isCompleted ?
+            '<button title="Already completed" class="mini-action-btn completed-btn" disabled><i class="fas fa-check"></i></button>' :
+            `<button onclick="showCompletionModal(${workout.id})" title="Mark as completed" class="mini-action-btn complete-btn"><i class="fas fa-check"></i></button>`;
+        workoutCard.innerHTML =
+            `<div class="day-workout-header">
+                <h4>${workout.title}</h4>
+                <span class="difficulty-badge small ${difficultyClass}">${workout.difficulty}</span>
+                ${completedIcon}
+            </div>
+            <div class="day-workout-meta">
+                <span><i class="fas fa-clock"></i> ${workout.duration} min</span>
+            </div>
+            <div class="day-workout-actions">
+                <button onclick="showWorkoutVideo(${workout.id})" class="mini-action-btn" title="Start Workout">
+                    <i class="fas fa-play"></i>
+                </button>
+                ${completeButton}
+                <button onclick="removeScheduledWorkout(${workout.id})" class="mini-action-btn" title="Remove Workout">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>`;
+        dayContainer.appendChild(workoutCard);
+    });
+    document.querySelectorAll('.day-workouts').forEach((container) => {
+        if (container.children.length === 0) {
+            const emptyState = document.createElement('div');
+            emptyState.classList.add('empty-day');
+            emptyState.innerHTML = `<p>No workouts</p>`;
+            container.appendChild(emptyState);
+        }
+    });
+
+    const listContainer = document.getElementById('scheduled-workouts-list');
+    if (listContainer) {
+        displayWorkoutsList(scheduledWorkouts);
+    }
+}
+
+function displayWorkoutsList(workouts) {
+    const listContainer = document.getElementById('scheduled-workouts-list');
+    const noWorkoutsMessage = document.getElementById('no-workouts');
+
+    if (!listContainer) return;
+
+    listContainer.innerHTML = '';
+
+    if (!noWorkoutsMessage) {
+        console.log("Warning: no-workouts element not found");
+    } else {
+        if (workouts.length === 0) {
+            listContainer.style.display = 'none';
+            noWorkoutsMessage.style.display = 'flex';
+            return;
+        }
+        listContainer.style.display = 'block';
+        noWorkoutsMessage.style.display = 'none';
+    }
+
+    const workoutsByDate = {};
+    workouts.forEach(workout => {
+        if (!workout.scheduled_date) {
+            if (!workoutsByDate['Unscheduled']) {
+                workoutsByDate['Unscheduled'] = [];
+            }
+            workoutsByDate['Unscheduled'].push(workout);
+            return;
+        }
+        const dateStr = workout.scheduled_date;
+        if (!workoutsByDate[dateStr]) {
+            workoutsByDate[dateStr] = [];
+        }
+        workoutsByDate[dateStr].push(workout);
+    });
+    const sortedDates = Object.keys(workoutsByDate).sort((a, b) => {
+        if (a === 'Unscheduled') return 1;
+        if (b === 'Unscheduled') return -1;
+        return new Date(a) - new Date(b);
+    });
+    sortedDates.forEach(dateStr => {
+        const dateWorkouts = workoutsByDate[dateStr];
+        const dateHeader = document.createElement('div');
+        dateHeader.classList.add('date-header');
+        let dateDisplay = "Unscheduled";
+        if (dateStr !== 'Unscheduled') {
+            const date = new Date(dateStr + "T00:00:00");
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateDisplay = date.toLocaleDateString('en-US', options);
+            const today = new Date();
+            if (date.getDate() === today.getDate() &&
+                date.getMonth() === today.getMonth() &&
+                date.getFullYear() === today.getFullYear()) {
+                dateDisplay += " (Today)";
+            }
+        }
+        dateHeader.innerHTML =
+            `<h3>${dateDisplay}</h3>
+            <span class="workout-count">${dateWorkouts.length} workout${dateWorkouts.length > 1 ? 's' : ''}</span>`;
+        listContainer.appendChild(dateHeader);
+        dateWorkouts.forEach(workout => {
+            let difficultyClass = '';
+            if (workout.difficulty === 'Beginner') difficultyClass = 'difficulty-beginner';
+            else if (workout.difficulty === 'Intermediate') difficultyClass = 'difficulty-intermediate';
+            else if (workout.difficulty === 'Advanced') difficultyClass = 'difficulty-advanced';
+            const isCompleted = workout.completed;
+            const completeActionBtn = isCompleted ?
+                `<button class="action-btn complete-action completed" disabled title="Already completed">
+                    <i class="fas fa-check-circle"></i>
+                </button>` :
+                `<button onclick="showCompletionModal(${workout.id})" class="action-btn complete-action" title="Mark as completed">
+                    <i class="fas fa-check"></i>
+                </button>`;
+            const workoutCard = document.createElement('div');
+            workoutCard.classList.add('scheduled-workout-card', isCompleted ? 'completed' : '');
+            workoutCard.dataset.workoutId = workout.id;
+            workoutCard.innerHTML =
+                `<div class="scheduled-workout-info">
+                    <div class="scheduled-workout-header">
+                        <h4>${workout.title} ${isCompleted ? '<span class="completed-tag">✓ Completed</span>' : ''}</h4>
+                        <span class="difficulty-badge ${difficultyClass}">${workout.difficulty}</span>
+                    </div>
+                    <div class="scheduled-workout-meta">
+                        <span><i class="fas fa-clock"></i> ${workout.duration} min</span>
+                    </div>
+                    <p class="scheduled-workout-description">${workout.description}</p>
+                </div>
+                <div class="scheduled-workout-actions">
+                    <a href="/workout/${workout.id}" class="btn primary-btn">
+                        <i class="fas fa-play"></i> Start
+                    </a>
+                    <button class="btn secondary-btn" onclick="showScheduleModal(${workout.id}, '${workout.title}')">
+                        <i class="fas fa-calendar-alt"></i> Reschedule
+                    </button>
+                </div>`;
+            listContainer.appendChild(workoutCard);
+        });
+    });
+}
+
+function loadCompletedWorkouts(){
+    fetch('/get-completed-workouts')
+    .then(response => response.json())
+    .then(data => {
+        const container = document.getElementById('completed-workouts-list');
+        container.innerHTML = '';
+        if(data.completed_workouts && data.completed_workouts.length > 0){
+            data.completed_workouts.forEach(workout => {
+                const card = document.createElement('div');
+                card.classList.add('scheduled-workout-card');
+                card.innerHTML = `
+                    <div class="scheduled-workout-info">
+                        <div class="scheduled-workout-header">
+                            <h4>${workout.title}</h4>
+                        </div>
+                        <div class="scheduled-workout-meta">
+                            <span><i class="fas fa-clock"></i> ${workout.duration} min</span>
+                            <span><i class="fas fa-star"></i> Rating: ${workout.rating || 'N/A'}</span>
+                        </div>
+                        <p class="scheduled-workout-description">Notes: ${workout.notes || 'No notes provided.'}</p>
+                        <p class="scheduled-workout-date">Completed on: ${workout.completed_date}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            document.getElementById('no-completed-workouts').style.display = 'none';
+        } else {
+            document.getElementById('no-completed-workouts').style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error loading completed workouts:', error);
+    });
+}
+
+
+function showWorkoutVideo(workoutId) {
+    currentWorkout = scheduledWorkouts.find(w => w.id === workoutId);
+    if (!currentWorkout) {
+        showNotification('Workout not found', 'error');
+        return;
+    }
+    document.getElementById('video-title').textContent = currentWorkout.title;
+    document.getElementById('video-description').textContent = currentWorkout.description;
+    console.log("Loading video URL:", currentWorkout.video_url);
+    document.getElementById('video-container').innerHTML =
+        `<iframe
+            width="100%"
+            height="100%"
+            src="${currentWorkout.video_url}"
+            title="${currentWorkout.title}"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+        </iframe>`;
+
+    resetTimer();
+
+    const timerDisplay = document.getElementById('timer-display');
+    if (timerDisplay) {
+        if (timerDisplay.style.display === 'block') {
+            document.getElementById('start-timer-btn').innerHTML = '<i class="fas fa-stopwatch"></i> Hide Timer';
+        } else {
+            timerDisplay.style.display = 'none';
+            document.getElementById('start-timer-btn').innerHTML = '<i class="fas fa-stopwatch"></i> Start Timer';
+        }
+    }
+
+    const modal = document.getElementById('video-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('visible');
+    }, 10);
+}
+
+function closeVideoModal() {
+    const modal = document.getElementById('video-modal');
+    modal.classList.remove('visible');
+    setTimeout(() => {
+        modal.style.display = 'none';
+        document.getElementById('video-container').innerHTML = '';
+        if (timerRunning) {
+            stopTimer();
+        }
+    }, 300);
+    currentWorkout = null;
+}
+
+function showCompletionModal(workoutId) {
+    currentWorkout = scheduledWorkouts.find(w => w.id === workoutId);
+    if (!currentWorkout) {
+        showNotification('Workout not found', 'error');
+        return;
+    }
+    selectedRating = 0;
+    document.querySelectorAll('.rating-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    document.getElementById('intensity').value = 5;
+    document.getElementById('completion-notes').value = '';
+    document.getElementById('completion-title').textContent = `Complete: ${currentWorkout.title}`;
+    const modal = document.getElementById('completion-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('visible');
+    }, 10);
+}
+
+function closeCompletionModal() {
+    const modal = document.getElementById('completion-modal');
+    modal.classList.remove('visible');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+    currentWorkout = null;
+}
+
+function confirmCompletionWorkout() {
+    if (!currentWorkout) {
+        showNotification('No workout selected', 'error');
+        closeCompletionModal();
+        return;
+    }
+    if (selectedRating === 0) {
+        showNotification('Please rate how you felt during the workout', 'error');
+        return;
+    }
+    const intensity = document.getElementById('intensity').value;
+    const notes = document.getElementById('completion-notes').value;
+    const confirmBtn = document.querySelector('#completion-modal .primary-btn');
+    const originalText = confirmBtn.textContent;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    confirmBtn.disabled = true;
+    fetch('/complete-workout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            workout_id: currentWorkout.id,
+            duration: currentWorkout.duration,
+            rating: selectedRating,
+            intensity: intensity,
+            notes: notes,
+            improved: false
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        const workout = scheduledWorkouts.find(w => w.id === currentWorkout.id);
+        if (workout) {
+            workout.completed = true;
+        }
+        closeCompletionModal();
+        displayScheduledWorkouts();
+        showNotification('Workout completed! Great job!', 'success');
+        confirmBtn.innerHTML = originalText;
+        confirmBtn.disabled = false;
+        updateStreak();
+    });
+}
+
+function updateStreak() {
+    fetch('/update-streak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.streak) {
+            document.getElementById('streak-counter-display').innerHTML =
+                `${data.streak.current} <span>days</span>`;
+            document.getElementById('longest-streak-display').textContent =
+                data.streak.longest;
+            document.getElementById('streak-counter-display').classList.add('pulse');
+            setTimeout(() => {
+                document.getElementById('streak-counter-display').classList.remove('pulse');
+            }, 1000);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating streak:', error);
+    });
+}
+
+function initializeTimer() {
+    document.getElementById('timer-start').addEventListener('click', startTimer);
+    document.getElementById('timer-pause').addEventListener('click', pauseTimer);
+    document.getElementById('timer-reset').addEventListener('click', resetTimer);
+
+    document.getElementById('start-timer-btn').addEventListener('click', function() {
+        const timerDisplay = document.getElementById('timer-display');
+        if (timerDisplay && timerDisplay.style.display === 'none') {
+            timerDisplay.style.display = 'block';
+            this.innerHTML = '<i class="fas fa-stopwatch"></i> Hide Timer';
+        } else if (timerDisplay) {
+            timerDisplay.style.display = 'none';
+            this.innerHTML = '<i class="fas fa-stopwatch"></i> Start Timer';
+            if (timerRunning) {
+                stopTimer();
+            }
+        }
+    });
+
+    document.getElementById('improve-workout-btn').addEventListener('click', function() {
+        if (currentWorkout) {
+            showImproveWorkoutModal(currentWorkout.id);
+        }
+    });
+}
+
+function startTimer() {
+    if (!timerRunning) {
+        timerRunning = true;
+        timerInterval = setInterval(() => {
+            totalSeconds++;
+            updateTimerDisplay();
+        }, 1000);
+        document.getElementById('timer-start').disabled = true;
+        document.getElementById('timer-pause').disabled = false;
+        document.getElementById('timer-reset').disabled = false;
+    }
+}
+
+function pauseTimer() {
+    if (timerRunning) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        document.getElementById('timer-start').disabled = false;
+        document.getElementById('timer-pause').disabled = true;
+    }
+}
+
+function stopTimer() {
+    timerRunning = false;
+    clearInterval(timerInterval);
+    document.getElementById('timer-start').disabled = false;
+    document.getElementById('timer-pause').disabled = true;
+    document.getElementById('timer-reset').disabled = true;
+}
+
+function resetTimer() {
+    if (timerRunning) {
+        stopTimer();
+    }
+    timerSeconds = 0;
+    totalSeconds = 0;
+    updateTimerDisplay();
+    document.getElementById('timer-start').disabled = false;
+    document.getElementById('timer-pause').disabled = true;
+    document.getElementById('timer-reset').disabled = true;
+}
+
+function updateTimerDisplay() {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const timeString =
+        String(hours).padStart(2, '0') + ':' +
+        String(minutes).padStart(2, '0') + ':' +
+        String(seconds).padStart(2, '0');
+    document.querySelector('.timer').textContent = timeString;
+}
+
+function initializeImprovementOptions() {
+    document.querySelectorAll('.difficulty-option').forEach(option => {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.difficulty-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            this.classList.add('selected');
+        });
+    });
+    const durationSlider = document.getElementById('duration-slider');
+    const durationValue = document.getElementById('duration-value');
+    if (durationSlider && durationValue) {
+        durationSlider.addEventListener('input', function() {
+            durationValue.textContent = this.value + ' min';
+        });
+    }
+}
+
+function showImproveWorkoutModal(workoutId) {
+    currentWorkout = scheduledWorkouts.find(w => w.id === workoutId);
+    if (!currentWorkout) {
+        showNotification('Workout not found', 'error');
+        return;
+    }
+    document.getElementById('current-difficulty').innerHTML = `Current: <span>${currentWorkout.difficulty}</span>`;
+    document.getElementById('current-duration').innerHTML = `Current: <span>${currentWorkout.duration}</span> minutes`;
+    document.querySelectorAll('.difficulty-option').forEach(option => {
+        if (option.getAttribute('data-difficulty') === currentWorkout.difficulty) {
+            option.classList.add('selected');
+        } else {
+            option.classList.remove('selected');
+        }
+    });
+    const durationSlider = document.getElementById('duration-slider');
+    durationSlider.value = currentWorkout.duration;
+    document.getElementById('duration-value').textContent = currentWorkout.duration + ' min';
+    const modal = document.getElementById('improve-workout-modal');
+    modal.style.display = 'flex';
+    setTimeout(() => {
+        modal.classList.add('visible');
+    }, 10);
+}
+
+function closeImproveModal() {
+    const modal = document.getElementById('improve-workout-modal');
+    modal.classList.remove('visible');
+    setTimeout(() => {
+        modal.style.display = 'none';
+    }, 300);
+    currentWorkout = null;
+}
+
+function confirmImproveWorkout() {
+    if (!currentWorkout) {
+        showNotification('No workout selected', 'error');
+        closeImproveModal();
+        return;
+    }
+    const selectedDifficultyElement = document.querySelector('.difficulty-option.selected');
+    if (!selectedDifficultyElement) {
+        showNotification('Please select a difficulty level', 'error');
+        return;
+    }
+    const selectedDifficulty = selectedDifficultyElement.getAttribute('data-difficulty');
+    const selectedDuration = document.getElementById('duration-slider').value;
+    if (selectedDifficulty === currentWorkout.difficulty && parseInt(selectedDuration) === currentWorkout.duration) {
+        showNotification('No changes made to workout', 'info');
+        closeImproveModal();
+        return;
+    }
+    const confirmBtn = document.querySelector('#improve-workout-modal .primary-btn');
+    const originalBtnText = confirmBtn.innerHTML;
+    confirmBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+    confirmBtn.disabled = true;
+    fetch('/improve-workout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            workout_id: currentWorkout.id,
+            difficulty: selectedDifficulty,
+            duration: parseInt(selectedDuration)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        confirmBtn.innerHTML = originalBtnText;
+        confirmBtn.disabled = false;
+        closeImproveModal();
+        showNotification(data.message || 'Workout improved successfully!', 'success');
+        loadScheduledWorkouts();
+    })
+    .catch(error => {
+        console.error('Error improving workout:', error);
+        confirmBtn.innerHTML = originalBtnText;
+        confirmBtn.disabled = false;
+        showNotification('Failed to improve workout', 'error');
+    });
+}
+
+function removeScheduledWorkout(workoutId) {
+    if (!confirm('Are you sure you want to remove this workout?')) {
+        return;
+    }
+    const workoutCards = document.querySelectorAll(`[data-workout-id="${workoutId}"]`);
+    workoutCards.forEach(card => {
+        card.classList.add('removing');
+    });
+    fetch('/remove-workout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workout_id: workoutId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        showNotification(data.message || 'Workout removed successfully!', 'success');
+        workoutCards.forEach(card => {
+            card.style.height = card.offsetHeight + 'px';
+            setTimeout(() => {
+                card.style.height = '0';
+                card.style.padding = '0';
+                card.style.margin = '0';
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    scheduledWorkouts = scheduledWorkouts.filter(w => w.id !== workoutId);
+                    displayScheduledWorkouts();
+                }, 300);
+            }, 10);
+        });
+    })
+    .catch(error => {
+        console.error('Error removing workout:', error);
+        showNotification('Failed to remove workout', 'error');
+        workoutCards.forEach(card => {
+            card.classList.remove('removing');
+        });
+    });
+}
+
+function animateStreakCounter() {
+    const streakCounter = document.getElementById('streak-counter-display');
+    if (!streakCounter) return;
+    const currentStreak = parseInt(streakCounter.textContent);
+    if (currentStreak > 0) {
+        streakCounter.classList.add('pulse');
+        setTimeout(() => {
+            streakCounter.classList.remove('pulse');
+        }, 1000);
+    }
+}
+
+window.onclick = function(event) {
+    const videoModal = document.getElementById('video-modal');
+    const improveModal = document.getElementById('improve-workout-modal');
+    const completionModal = document.getElementById('completion-modal');
+    if (event.target === videoModal) {
+        closeVideoModal();
+    }
+    if (event.target === improveModal) {
+        closeImproveModal();
+    }
+    if (event.target === completionModal) {
+        closeCompletionModal();
+    }
+};
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeVideoModal();
+        closeImproveModal();
+        closeCompletionModal();
+        dismissNotification();
+    }
+});
+</script>
+</body>
+</html>

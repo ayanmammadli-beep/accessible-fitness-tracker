@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Workouts</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v={{ time.time() }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header class="portal-header">
+        <h1>Welcome, <span class="highlight">{{ user.full_name }}</span></h1>
+        <nav class="nav-menu">
+            <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+            <a href="{{ url_for('workout_finder') }}" class="nav-link">Find Workouts</a>
+            <a href="{{ url_for('my_workouts') }}" class="nav-link active">My Workouts</a>
+            <a href="{{ url_for('diet_management') }}" class="nav-link">Diet</a>
+        </nav>
+        <button class="btn logout-btn" onclick="window.location.href='{{ url_for('logout') }}'">Logout</button>
+    </header>
+
+    <div class="my-workouts-container">
+        <div class="page-header">
+            <h2>My <span class="highlight">Workouts</span></h2>
+            <a href="{{ url_for('workout_finder') }}" class="btn primary-btn">
+                <i class="fas fa-plus"></i> Add Workouts
+            </a>
+        </div>
+
+        <div class="tabs-container">
+            <div class="tabs">
+                <button class="tab-btn active" onclick="showTab('all')">All Workouts</button>
+                <button class="tab-btn" onclick="showTab('scheduled')">Scheduled</button>
+                <button class="tab-btn" onclick="showTab('calendar')">Calendar View</button>
+            </div>
+        </div>
+
+        <div id="all" class="tab-content active">
+            {% if saved_workouts %}
+                <div class="saved-workouts-grid">
+                    {% for saved in saved_workouts %}
+                        <div class="saved-workout-card">
+                            <div class="workout-card-header">
+                                <h3>{{ saved.workout.title }}</h3>
+                                <span class="difficulty-pill {{ saved.workout.difficulty.lower() }}">
+                                    {{ saved.workout.difficulty }}
+                                </span>
+                            </div>
+                            <div class="workout-card-meta">
+                                <span><i class="fas fa-clock"></i> {{ saved.workout.duration }} min</span>
+                                {% if saved.workout.fitness_priority %}
+                                    <span><i class="fas fa-bullseye"></i> {{ saved.workout.fitness_priority.name }}</span>
+                                {% endif %}
+                            </div>
+                            <p class="workout-card-description">{{ saved.workout.description }}</p>
+                            {% if saved.scheduled_date %}
+                                <div class="scheduled-badge">
+                                    <i class="fas fa-calendar-check"></i> Scheduled for {{ saved.scheduled_date.strftime('%b %d, %Y') }}
+                                </div>
+                            {% endif %}
+                            <div class="workout-card-actions">
+                                <a href="{{ url_for('workout_timer', workout_id=saved.workout.id) }}" class="btn primary-btn">
+                                    <i class="fas fa-play"></i> Start
+                                </a>
+                                <button class="btn secondary-btn" onclick="showScheduleModal({{ saved.id }}, '{{ saved.workout.title }}')">
+                                    <i class="fas fa-calendar-plus"></i>
+                                </button>
+                                <button class="btn danger-btn" onclick="showRemoveConfirm({{ saved.id }}, '{{ saved.workout.title }}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <i class="fas fa-dumbbell"></i>
+                    <h3>No saved workouts yet</h3>
+                    <p>Start by finding workouts that match your health conditions and fitness goals.</p>
+                    <a href="{{ url_for('workout_finder') }}" class="btn primary-btn">Find Workouts</a>
+                </div>
+            {% endif %}
+        </div>
+
+        <div id="scheduled" class="tab-content">
+            <div class="scheduled-list">
+                {% set has_scheduled = false %}
+                {% for saved in saved_workouts %}
+                    {% if saved.scheduled_date %}
+                        {% set has_scheduled = true %}
+                        <div class="scheduled-workout-item">
+                            <div class="scheduled-date">
+                                <span class="date-day">{{ saved.scheduled_date.strftime('%d') }}</span>
+                                <span class="date-month">{{ saved.scheduled_date.strftime('%b') }}</span>
+                            </div>
+                            <div class="scheduled-workout-info">
+                                <h3>{{ saved.workout.title }}</h3>
+                                <div class="workout-meta">
+                                    <span><i class="fas fa-clock"></i> {{ saved.workout.duration }} min</span>
+                                    <span class="difficulty-pill {{ saved.workout.difficulty.lower() }}">
+                                        {{ saved.workout.difficulty }}
+                                    </span>
+                                </div>
+                                <p>{{ saved.workout.description|truncate(100) }}</p>
+                            </div>
+                            <div class="scheduled-workout-actions">
+                                <a href="{{ url_for('workout_timer', workout_id=saved.workout.id) }}" class="btn primary-btn">
+                                    <i class="fas fa-play"></i> Start
+                                </a>
+                                <button class="btn secondary-btn" onclick="showScheduleModal({{ saved.id }}, '{{ saved.workout.title }}')">
+                                    <i class="fas fa-calendar-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+
+                {% if not has_scheduled %}
+                    <div class="empty-state">
+                        <i class="fas fa-calendar"></i>
+                        <h3>No scheduled workouts</h3>
+                        <p>Schedule your saved workouts to create a consistent routine.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="calendar" class="tab-content">
+            <div class="calendar-view">
+                <div class="calendar-header">
+                    <button class="btn icon-btn" onclick="previousMonth()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <h3 id="calendar-month">Month Year</h3>
+                    <button class="btn icon-btn" onclick="nextMonth()">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+                <div class="calendar-grid">
+                    <div class="calendar-weekdays">
+                        <div>Sun</div>
+                        <div>Mon</div>
+                        <div>Tue</div>
+                        <div>Wed</div>
+                        <div>Thu</div>
+                        <div>Fri</div>
+                        <div>Sat</div>
+                    </div>
+                    <div id="calendar-days" class="calendar-days">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="schedule-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Schedule Workout</h2>
+                <span class="close-modal" onclick="closeModal()">×</span>
+            </div>
+            <div class="modal-body">
+                <p>Select a date for <span id="workout-title"></span>:</p>
+                <input type="date" id="schedule-date" class="date-picker" min="">
+                <input type="hidden" id="saved-workout-id">
+                <div class="modal-actions">
+                    <button class="btn secondary-btn" onclick="closeModal()">Cancel</button>
+                    <button class="btn primary-btn" onclick="scheduleWorkout()">Schedule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="remove-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Remove Workout</h2>
+                <span class="close-modal" onclick="closeRemoveModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to remove <span id="remove-workout-title"></span> from your saved workouts?</p>
+                <input type="hidden" id="remove-workout-id">
+                <div class="modal-actions">
+                    <button class="btn secondary-btn" onclick="closeRemoveModal()">Cancel</button>
+                    <button class="btn danger-btn" onclick="removeWorkout()">Remove</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+            event.currentTarget.classList.add('active');
+            if (tabId === 'calendar') {
+                initCalendar();
+            }
+        }
+
+        let currentDate = new Date();
+        const scheduledDates = [
+            {% for saved in saved_workouts %}
+                {% if saved.scheduled_date %}
+                    {
+                        date: "{{ saved.scheduled_date }}",
+                        workoutId: {{ saved.workout.id }},
+                        title: "{{ saved.workout.title }}"
+                    },
+                {% endif %}
+            {% endfor %}
+        ];
+
+        function initCalendar() {
+            updateCalendarHeader();
+            generateCalendarDays();
+        }
+
+        function updateCalendarHeader() {
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                              "July", "August", "September", "October", "November", "December"];
+            const monthYearStr = `${monthNames[currentDate.getMonth()]} ${currentDate.getFullYear()}`;
+            document.getElementById('calendar-month').textContent = monthYearStr;
+        }
+
+        function generateCalendarDays() {
+            const calendarDays = document.getElementById('calendar-days');
+            calendarDays.innerHTML = '';
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDayOfWeek = firstDay.getDay();
+            for (let i = 0; i < startDayOfWeek; i++) {
+                const dayEl = document.createElement('div');
+                dayEl.classList.add('calendar-day', 'empty');
+                calendarDays.appendChild(dayEl);
+            }
+            for (let day = 1; day <= lastDay.getDate(); day++) {
+                const dayEl = document.createElement('div');
+                dayEl.classList.add('calendar-day');
+                const currentDay = new Date();
+                if (year === currentDay.getFullYear() && month === currentDay.getMonth() && day === currentDay.getDate()) {
+                    dayEl.classList.add('today');
+                }
+                const dayNumber = document.createElement('span');
+                dayNumber.classList.add('day-number');
+                dayNumber.textContent = day;
+                dayEl.appendChild(dayNumber);
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const workoutsOnDay = scheduledDates.filter(sd => sd.date === dateStr);
+                if (workoutsOnDay.length > 0) {
+                    dayEl.classList.add('has-workout');
+                    const workoutsList = document.createElement('div');
+                    workoutsList.classList.add('day-workouts');
+                    workoutsOnDay.forEach(workout => {
+                        const workoutItem = document.createElement('div');
+                        workoutItem.classList.add('day-workout-item');
+                        workoutItem.textContent = workout.title;
+                        workoutItem.addEventListener('click', () => {
+                            window.location.href = `/workout/${workout.workoutId}`;
+                        });
+                        workoutsList.appendChild(workoutItem);
+                    });
+                    dayEl.appendChild(workoutsList);
+                }
+                calendarDays.appendChild(dayEl);
+            }
+        }
+
+        function previousMonth() {
+            document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+                el.style.opacity = '0';
+            });
+            setTimeout(() => {
+                currentDate.setMonth(currentDate.getMonth() - 1);
+                initCalendar();
+                displayScheduledWorkouts();
+                setTimeout(() => {
+                    document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+                        el.style.opacity = '1';
+                    });
+                }, 50);
+            }, 300);
+        }
+
+        function nextMonth() {
+            document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+                el.style.opacity = '0';
+            });
+            setTimeout(() => {
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                initCalendar();
+                displayScheduledWorkouts();
+                setTimeout(() => {
+                    document.querySelectorAll('.day-workouts, .date-display').forEach(el => {
+                        el.style.opacity = '1';
+                    });
+                }, 50);
+            }, 300);
+        }
+
+        function initializeTabs() {
+            const tabs = document.querySelectorAll('.calendar-tab');
+            tabs.forEach(tab => {
+                tab.addEventListener('click', function() {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    this.classList.add('active');
+                    document.querySelectorAll('.calendar-view').forEach(view => {
+                        view.classList.remove('active');
+                    });
+                    const viewId = this.getAttribute('data-view') + '-view';
+                    document.getElementById(viewId).classList.add('active');
+                });
+            });
+        }
+
+        function initializeFilters() {
+            document.getElementById('date-filter').addEventListener('change', function() {
+                filterWorkouts();
+            });
+            document.getElementById('difficulty-filter').addEventListener('change', function() {
+                filterWorkouts();
+            });
+            document.getElementById('clear-filters').addEventListener('click', function() {
+                document.getElementById('date-filter').value = '';
+                document.getElementById('difficulty-filter').value = '';
+                filterWorkouts();
+                showNotification('Filters cleared', 'info');
+            });
+        }
+
+        function filterWorkouts() {
+            const dateFilter = document.getElementById('date-filter').value;
+            const difficultyFilter = document.getElementById('difficulty-filter').value;
+            let dateFilterObj = null;
+            if (dateFilter) {
+                dateFilterObj = new Date(dateFilter);
+                dateFilterObj.setHours(0, 0, 0, 0);
+            }
+            let filteredWorkouts = scheduledWorkouts;
+            if (dateFilterObj) {
+                filteredWorkouts = filteredWorkouts.filter(workout => {
+                    if (!workout.scheduled_date) return false;
+                    const workoutDate = new Date(workout.scheduled_date + "T00:00:00");
+                    workoutDate.setHours(0, 0, 0, 0);
+                    return workoutDate.getTime() === dateFilterObj.getTime();
+                });
+            }
+            if (difficultyFilter) {
+                filteredWorkouts = filteredWorkouts.filter(workout =>
+                    workout.difficulty === difficultyFilter
+                );
+            }
+            displayWorkoutsList(filteredWorkouts);
+        }
+
+        function loadScheduledWorkouts() {
+            fetch('/get-scheduled-workouts')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    scheduledWorkouts = data.workouts.filter(workout => workout.scheduled_date).map(workout => {
+                        if (workout.scheduled_date) {
+                            workout.date_obj = new Date(workout.scheduled_date + "T00:00:00");
+                        }
+                        return workout;
+                    });
+                    scheduledWorkouts.sort((a, b) => {
+                        if (!a.scheduled_date) return 1;
+                        if (!b.scheduled_date) return -1;
+                        return a.date_obj - b.date_obj;
+                    });
+                    displayScheduledWorkouts();
+                })
+        }
+
+        function displayScheduledWorkouts() {
+            document.querySelectorAll('.day-workouts').forEach(container => {
+                container.innerHTML = '';
+            });
+            const weekDates = [];
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(currentDate);
+                date.setDate(currentDate.getDate() + i);
+                weekDates.push(date);
+            }
+            const weekWorkouts = scheduledWorkouts.filter(workout => {
+                if (!workout.scheduled_date) return false;
+                const workoutDate = workout.date_obj;
+                for (let date of weekDates) {
+                    if (workoutDate.getDate() === date.getDate() &&
+                        workoutDate.getMonth() === date.getMonth() &&
+                        workoutDate.getFullYear() === date.getFullYear()) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            weekWorkouts.forEach(workout => {
+                const workoutDate = workout.date_obj;
+                const dayIndex = workoutDate.getDay() === 0 ? 6 : workoutDate.getDay() - 1;
+                const dayContainer = document.querySelectorAll('.day-workouts')[dayIndex];
+                if (!dayContainer) return;
+                const workoutCard = document.createElement('div');
+                workoutCard.classList.add('day-workout-card');
+                workoutCard.dataset.workoutId = workout.id;
+                let difficultyClass = '';
+                if (workout.difficulty === 'Beginner') difficultyClass = 'difficulty-beginner';
+                else if (workout.difficulty === 'Intermediate') difficultyClass = 'difficulty-intermediate';
+                else if (workout.difficulty === 'Advanced') difficultyClass = 'difficulty-advanced';
+                const isCompleted = workout.completed;
+                const completedIcon = isCompleted ?
+                    '<div class="completed-indicator"><i class="fas fa-check-circle"></i></div>' : '';
+                const completeButton = isCompleted ?
+                    '<button title="Already completed" class="mini-action-btn completed-btn" disabled><i class="fas fa-check"></i></button>' :
+                    `<button onclick="showCompletionModal(${workout.id})" title="Mark as completed" class="mini-action-btn complete-btn"><i class="fas fa-check"></i></button>`;
+                workoutCard.innerHTML =
+                    `<div class="day-workout-header">
+                        <h4>${workout.title}</h4>
+                        <span class="difficulty-badge small ${difficultyClass}">${workout.difficulty}</span>
+                        ${completedIcon}
+                    </div>
+                    <div class="day-workout-meta">
+                        <span><i class="fas fa-clock"></i> ${workout.duration} min</span>
+                    </div>
+                    <div class="day-workout-actions">
+                        <button onclick="showWorkoutVideo(${workout.id})" class="mini-action-btn" title="Start Workout">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        ${completeButton}
+                        <button onclick="removeScheduledWorkout(${workout.id})" class="mini-action-btn" title="Remove Workout">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>`;
+                dayContainer.appendChild(workoutCard);
+            });
+            document.querySelectorAll('.day-workouts').forEach((container) => {
+                if (container.children.length === 0) {
+                    const emptyState = document.createElement('div');
+                    emptyState.classList.add('empty-day');
+                    emptyState.innerHTML = `<p>No workouts</p>`;
+                    container.appendChild(emptyState);
+                }
+            });
+            displayWorkoutsList(scheduledWorkouts);
+        }
+
+        function displayWorkoutsList(workouts) {
+            const listContainer = document.getElementById('scheduled-workouts-list');
+            const noWorkoutsMessage = document.getElementById('no-workouts');
+            listContainer.innerHTML = '';
+            if (workouts.length === 0) {
+                listContainer.style.display = 'none';
+                noWorkoutsMessage.style.display = 'flex';
+                return;
+            }
+            listContainer.style.display = 'block';
+            noWorkoutsMessage.style.display = 'none';
+            const workoutsByDate = {};
+            workouts.forEach(workout => {
+                if (!workout.scheduled_date) {
+                    if (!workoutsByDate['Unscheduled']) {
+                        workoutsByDate['Unscheduled'] = [];
+                    }
+                    workoutsByDate['Unscheduled'].push(workout);
+                    return;
+                }
+                const dateStr = workout.scheduled_date;
+                if (!workoutsByDate[dateStr]) {
+                    workoutsByDate[dateStr] = [];
+                }
+                workoutsByDate[dateStr].push(workout);
+            });
+            const sortedDates = Object.keys(workoutsByDate).sort((a, b) => {
+                if (a === 'Unscheduled') return 1;
+                if (b === 'Unscheduled') return -1;
+                return new Date(a) - new Date(b);
+            });
+            sortedDates.forEach(dateStr => {
+                const dateWorkouts = workoutsByDate[dateStr];
+                const dateHeader = document.createElement('div');
+                dateHeader.classList.add('date-header');
+                let dateDisplay = "Unscheduled";
+                if (dateStr !== 'Unscheduled') {
+                    const date = new Date(dateStr + "T00:00:00");
+                    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+                    dateDisplay = date.toLocaleDateString('en-US', options);
+                    const today = new Date();
+                    if (date.getDate() === today.getDate() &&
+                        date.getMonth() === today.getMonth() &&
+                        date.getFullYear() === today.getFullYear()) {
+                        dateDisplay += " (Today)";
+                    }
+                }
+                dateHeader.innerHTML =
+                    `<h3>${dateDisplay}</h3>
+                <span class="workout-count">${dateWorkouts.length} workout${dateWorkouts.length > 1 ? 's' : ''}</span>`;
+                listContainer.appendChild(dateHeader);
+                dateWorkouts.forEach(workout => {
+                    let difficultyClass = '';
+                    if (workout.difficulty === 'Beginner') difficultyClass = 'difficulty-beginner';
+                    else if (workout.difficulty === 'Intermediate') difficultyClass = 'difficulty-intermediate';
+                    else if (workout.difficulty === 'Advanced') difficultyClass = 'difficulty-advanced';
+                    const isCompleted = workout.completed;
+                    const completeActionBtn = isCompleted ?
+                        `<button class="action-btn complete-action completed" disabled title="Already completed">
+                        <i class="fas fa-check-circle"></i>
+                    </button>` :
+                        `<button onclick="showCompletionModal(${workout.id})" class="action-btn complete-action" title="Mark as completed">
+                        <i class="fas fa-check"></i>
+                    </button>`;
+                    const workoutCard = document.createElement('div');
+                    workoutCard.classList.add('scheduled-workout-card', isCompleted ? 'completed' : '');
+                    workoutCard.dataset.workoutId = workout.id;
+                    workoutCard.innerHTML =
+                        `<div class="scheduled-workout-info">
+                    <div class="scheduled-workout-header">
+                        <h4>${workout.title} ${isCompleted ? '<span class="completed-tag">✓ Completed</span>' : ''}</h4>
+                        <span class="difficulty-badge ${difficultyClass}">${workout.difficulty}</span>
+                    </div>
+                    <div class="scheduled-workout-meta">
+                        <span><i class="fas fa-clock"></i> ${workout.duration} min</span>
+                    </div>
+                    <p class="scheduled-workout-description">${workout.description}</p>
+                </div>
+                <div class="scheduled-workout-actions">
+                    <a href="/workout/${workout.id}" class="btn primary-btn">
+                        <i class="fas fa-play"></i> Start
+                    </a>
+                    <button class="btn secondary-btn" onclick="showScheduleModal(${workout.id}, '${workout.title}')">
+                        <i class="fas fa-calendar-alt"></i> Reschedule
+                    </button>
+                </div>`;
+                    listContainer.appendChild(workoutCard);
+                });
+            });
+        }
+
+        function showWorkoutVideo(workoutId) {
+            currentWorkout = savedWorkouts.find(w => w.id === workoutId) ||
+                           currentWorkouts.find(w => w.id === workoutId);
+            if (!currentWorkout || !currentWorkout.video_url) {
+                showNotification('Video not available for this workout', 'error');
+                return;
+            }
+            document.getElementById('video-title').textContent = currentWorkout.title;
+            document.getElementById('video-description').textContent = currentWorkout.description;
+            document.getElementById('video-container').innerHTML =
+                `<iframe
+                    width="100%"
+                    height="100%"
+                    src="${currentWorkout.video_url}"
+                    title="${currentWorkout.title}"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+            </iframe>`;
+            resetTimer();
+            document.getElementById('timer-display').style.display = 'none';
+            const modal = document.getElementById('video-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.classList.add('visible');
+            }, 10);
+        }
+        window.onclick = function(event) {
+            const scheduleModal = document.getElementById('schedule-modal');
+            const removeModal = document.getElementById('remove-modal');
+            if (event.target === scheduleModal) {
+                closeModal();
+            }
+            if (event.target === removeModal) {
+                closeRemoveModal();
+            }
+        }
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+                closeRemoveModal();
+            }
+        });
+    </script>
+</body>
+</html>

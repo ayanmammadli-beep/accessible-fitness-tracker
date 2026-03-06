@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fitness Landing Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+    <header class="header-section" style="background-image: url('{{ url_for('static', filename='fitness_banner.png') }}'); background-size: cover; background-position: center;">
+        <div class="header-blur"></div>
+        <div class="header-content">
+            <h1 class="header-title-line1">ADAPTING FITNESS</h1>
+            <h1 class="header-title-line2">TO <span class="highlight">YOU.</span></h1>
+            <div class="button-group">
+                <button class="btn primary-btn" onclick="window.location.href='/signup'">Sign Up</button>
+                <button class="btn login-btn" onclick="window.location.href='/login'">Login</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="image-container">
+            <img src="{{ url_for('static', filename='wom.jpg') }}" alt="Person exercising" class="exercise-image">
+        </div>
+        <div class="text-section">
+            <h2 class="section-title">INCLUSIVE FITNESS, <span class="highlight">UNLIMITED POSSIBILITIES</span></h2>
+            <p class="section-description">
+                With the use of precise filters on FitAdapt, find fitness routines that consider your specific health concerns.
+                Track, monitor, and enhance your workouts as well as your diets, progress, and more.
+            </p>
+            <button class="btn primary-btn" onclick="window.location.href='/signup'">Get Started</button>
+        </div>
+    </main>
+
+    <footer class="footer-section">
+        <p class="footer-text">MOVE. ADAPT. <span class="highlight">ACHIEVE.</span></p>
+    </footer>
+
+    <script>
+        gsap.from(".header-title-line1", { opacity: 0, y: -50, duration: 1, ease: "power2.out" });
+        gsap.from(".header-title-line2", { opacity: 0, y: 50, duration: 1, delay: 0.3, ease: "power2.out" });
+        gsap.from(".button-group", { opacity: 0, y: 30, duration: 1, delay: 0.6, ease: "power2.out" });
+        gsap.from(".exercise-image", { opacity: 0, scale: 0.9, duration: 1, delay: 0.9, ease: "power2.out" });
+        gsap.from(".text-section", { opacity: 0, x: 50, duration: 1, delay: 1.2, ease: "power2.out" });
+    </script>
+</body>
+</html>

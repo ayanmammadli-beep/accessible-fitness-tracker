@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v={{ time.time() }}">
+</head>
+<body>
+    <div class="auth-container">
+        <h1 class="auth-title">SIGN <span>UP</span></h1>
+        <form id="signupForm" class="auth-form">
+            <label for="fullname" class="auth-label">FULL NAME</label>
+            <input type="text" id="fullname" name="fullname" class="auth-input" placeholder="Enter your full name" required>
+
+            <label for="username" class="auth-label">USERNAME</label>
+            <input type="text" id="username" name="username" class="auth-input" placeholder="Enter your username" required>
+
+            <label for="password" class="auth-label">PASSWORD</label>
+            <input type="password" id="password" name="password" class="auth-input" placeholder="Enter your password" required>
+
+            <button type="submit" class="auth-btn">SIGN UP</button>
+        </form>
+        <p id="error-message" class="error-message" style="display: none; color: red;"></p>
+    </div>
+
+    <script>
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fullName = document.getElementById('fullname').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/signup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ full_name: fullName, username: username, password: password })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    window.location.href = data.redirect_url;
+                } else {
+                    errorMessage.style.display = 'block';
+                    errorMessage.textContent = data.error;
+                }
+            } catch (error) {
+                errorMessage.style.display = 'block';
+                errorMessage.textContent = 'An unexpected error occurred.';
+            }
+        });
+    </script>
+</body>
+</html>

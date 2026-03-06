@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workout Timer - {{ workout.title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}?v={{ time.time() }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="workout-timer-page">
+    <header class="portal-header">
+        <h1>{{ workout.title }}</h1>
+        <nav class="nav-menu">
+            <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+            <a href="{{ url_for('workout_finder') }}" class="nav-link">Find Workouts</a>
+            <a href="{{ url_for('my_workouts') }}" class="nav-link">My Workouts</a>
+        </nav>
+        <button class="btn secondary-btn" onclick="window.location.href='{{ url_for('dashboard') }}'">
+            <i class="fas fa-arrow-left"></i> Back
+        </button>
+    </header>
+
+    <div class="timer-container">
+        <div class="timer-layout">
+            <div class="workout-details-panel">
+                <div class="workout-info">
+                    <div class="difficulty-badge-large {{ workout.difficulty.lower() }}">{{ workout.difficulty }}</div>
+                    <div class="workout-info-meta">
+                        <span><i class="fas fa-clock"></i> {{ workout.duration }} min</span>
+                        {% if workout.fitness_priority %}
+                            <span><i class="fas fa-bullseye"></i> {{ workout.fitness_priority.name }}</span>
+                        {% endif %}
+                    </div>
+                    <p class="workout-detail-description">{{ workout.description }}</p>
+
+                    <div class="workout-detail-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">{{ progress_history|length }}</span>
+                            <span class="stat-label">Times Completed</span>
+                        </div>
+                        {% if progress_history %}
+                            <div class="stat-item">
+                                <span class="stat-number">{{ progress_history[0].duration }}</span>
+                                <span class="stat-label">Last Duration</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="video-container">
+                    {% if workout.video_url %}
+                        <iframe
+                            src="{{ workout.video_url }}"
+                            title="{{ workout.title }}"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen>
+                        </iframe>
+                    {% else %}
+                        <div class="video-placeholder">
+                            <i class="fas fa-video-slash"></i>
+                            <p>No video available</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="progress-history">
+                    <h3>Your History</h3>
+                    {% if progress_history %}
+                        <div class="history-list">
+                            {% for progress in progress_history %}
+                                <div class="history-item">
+                                    <div class="history-date">
+                                        {{ progress.completed_date.strftime('%b %d, %Y') }}
+                                    </div>
+                                    <div class="history-details">
+                                        <span>{{ progress.duration }} min</span>
+                                        {% if progress.improved %}
+                                            <span class="improved-badge">Improved</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="no-history">You haven't completed this workout yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="timer-panel">
+                <div class="timer-tabs">
+                    <button class="timer-tab active" onclick="showTimerTab('timer')">Timer</button>
+                    <button class="timer-tab" onclick="showTimerTab('intervals')">Intervals</button>
+                </div>
+
+                <div id="timer-tab-content" class="timer-tab-content active">
+                    <div class="timer-display">
+                        <div class="time">
+                            <span id="minutes">00</span>:<span id="seconds">00</span>
+                        </div>
+                        <div class="timer-label">Minutes : Seconds</div>
+                    </div>
+
+                    <div class="timer-controls">
+                        <button id="start-btn" class="timer-btn start" onclick="startTimer()">
+                            <i class="fas fa-play"></i> Start
+                        </button>
+                        <button id="pause-btn" class="timer-btn pause" onclick="pauseTimer()" disabled>
+                            <i class="fas fa-pause"></i> Pause
+                        </button>
+                        <button id="reset-btn" class="timer-btn reset" onclick="resetTimer()" disabled>
+                            <i class="fas fa-redo"></i> Reset
+                        </button>
+                    </div>
+
+                    <div class="suggested-duration">
+                        <p>Suggested Duration: <span class="highlight">{{ workout.duration }} minutes</span></p>
+                        <div class="duration-progress">
+                            <div id="duration-bar" class="duration-bar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
+                    <div id="completion-panel" class="completion-panel" style="display: none;">
+                        <h3>Great Job!</h3>
+                        <p>You've been working out for <span id="completion-time" class="highlight">0</span> minutes.</p>
+
+                        <div class="improvement-question">
+                            <p>Did you feel your performance improved?</p>
+                            <div class="improvement-options">
+                                <button id="improved-yes" class="improvement-btn" onclick="setImproved(true)">
+                                    <i class="fas fa-check"></i> Yes
+                                </button>
+                                <button id="improved-no" class="improvement-btn active" onclick="setImproved(false)">
+                                    <i class="fas fa-times"></i> Not Yet
+                                </button>
+                            </div>
+                        </div>
+
+                        {% if improved_workout %}
+                            <div class="next-level-suggestion">
+                                <h4>Ready for the next level?</h4>
+                                <p>We recommend trying <span class="highlight">{{ improved_workout.title }}</span> next time!</p>
+                                <button class="btn primary-btn" onclick="window.location.href='{{ url_for('workout_timer', workout_id=improved_workout.id) }}'">
+                                    View Next Level
+                                </button>
+                            </div>
+                        {% endif %}
+
+                        <button id="complete-workout-btn" class="btn primary-btn complete-btn" onclick="completeWorkout()">
+                            <i class="fas fa-check-circle"></i> Complete Workout
+                        </button>
+                    </div>
+                </div>
+
+                <div id="intervals-tab-content" class="timer-tab-content">
+                    <div class="intervals-setup">
+                        <h3>Interval Timer Setup</h3>
+                        <div class="interval-config">
+                            <div class="interval-input-group">
+                                <label for="work-time">Work</label>
+                                <div class="interval-input">
+                                    <input type="number" id="work-time" min="5" max="180" value="30">
+                                    <span>sec</span>
+                                </div>
+                            </div>
+                            <div class="interval-input-group">
+                                <label for="rest-time">Rest</label>
+                                <div class="interval-input">
+                                    <input type="number" id="rest-time" min="5" max="180" value="15">
+                                    <span>sec</span>
+                                </div>
+                            </div>
+                            <div class="interval-input-group">
+                                <label for="rounds">Rounds</label>
+                                <div class="interval-input">
+                                    <input type="number" id="rounds" min="1" max="20" value="5">
+                                </div>
+                            </div>
+                        </div>
+                        <button id="start-intervals-btn" class="btn primary-btn" onclick="startIntervals()">
+                            <i class="fas fa-play"></i> Start Intervals
+                        </button>
+                    </div>
+                    <div id="interval-display" class="interval-display" style="display: none;">
+                        <div class="interval-state">
+                            <div id="interval-state-badge" class="interval-badge work">WORK</div>
+                            <div id="interval-count" class="interval-count">Round 1/5</div>
+                        </div>
+                        <div class="interval-timer">
+                            <span id="interval-seconds">30</span>
+                            <span class="interval-timer-label">seconds</span>
+                        </div>
+                        <div class="interval-progress">
+                            <div id="interval-progress-bar" class="interval-progress-bar"></div>
+                        </div>
+                        <div class="interval-controls">
+                            <button id="interval-pause-btn" class="timer-btn pause" onclick="pauseIntervals()">
+                                <i class="fas fa-pause"></i> Pause
+                            </button>
+                            <button id="interval-reset-btn" class="timer-btn reset" onclick="resetIntervals()">
+                                <i class="fas fa-redo"></i> Reset
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let timerInterval;
+        let totalSeconds = 0;
+        let isRunning = false;
+        let improved = false;
+
+        function showTimerTab(tabId) {
+            document.querySelectorAll('.timer-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.timer-tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            if (tabId === 'timer') {
+                document.getElementById('timer-tab-content').classList.add('active');
+            } else if (tabId === 'intervals') {
+                document.getElementById('intervals-tab-content').classList.add('active');
+            }
+        }
+
+        function updateTimerDisplay() {
+            const minutesDisplay = document.getElementById('minutes');
+            const secondsDisplay = document.getElementById('seconds');
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            minutesDisplay.textContent = minutes.toString().padStart(2, '0');
+            secondsDisplay.textContent = seconds.toString().padStart(2, '0');
+            const suggestedDuration = {{ workout.duration }} * 60;
+            const progressPercentage = Math.min((totalSeconds / suggestedDuration) * 100, 100);
+            document.getElementById('duration-bar').style.width = `${progressPercentage}%`;
+            if (totalSeconds >= suggestedDuration && !document.getElementById('completion-panel').style.display === 'block') {
+                showCompletionPanel();
+            }
+        }
+
+        function startTimer() {
+            if (!isRunning) {
+                isRunning = true;
+                timerInterval = setInterval(() => {
+                    totalSeconds++;
+                    updateTimerDisplay();
+                }, 1000);
+                document.getElementById('start-btn').disabled = true;
+                document.getElementById('pause-btn').disabled = false;
+                document.getElementById('reset-btn').disabled = false;
+            }
+        }
+
+        function pauseTimer() {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                isRunning = false;
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('pause-btn').disabled = true;
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            isRunning = false;
+            totalSeconds = 0;
+            updateTimerDisplay();
+            document.getElementById('start-btn').disabled = false;
+            document.getElementById('pause-btn').disabled = true;
+            document.getElementById('reset-btn').disabled = true;
+            document.getElementById('completion-panel').style.display = 'none';
+        }
+
+        function showCompletionPanel() {
+            pauseTimer();
+            const completionTime = Math.floor(totalSeconds / 60);
+            document.getElementById('completion-time').textContent = completionTime;
+            document.getElementById('completion-panel').style.display = 'block';
+        }
+
+        function setImproved(value) {
+            improved = value;
+            if (value) {
+                document.getElementById('improved-yes').classList.add('active');
+                document.getElementById('improved-no').classList.remove('active');
+            } else {
+                document.getElementById('improved-yes').classList.remove('active');
+                document.getElementById('improved-no').classList.add('active');
+            }
+        }
+
+        function completeWorkout() {
+            const duration = Math.floor(totalSeconds / 60);
+            fetch('/complete-workout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    workout_id: {{ workout.id }},
+                    duration: duration,
+                    improved: improved
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('Workout completed successfully!');
+                window.location.href = '{{ url_for("dashboard") }}';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to save workout completion');
+            });
+        }
+
+        let intervalTimer;
+        let currentRound = 1;
+        let totalRounds = 5;
+        let workTime = 30;
+        let restTime = 15;
+        let currentTime = workTime;
+        let isWorkPhase = true;
+        let intervalsRunning = false;
+
+        function startIntervals() {
+            workTime = parseInt(document.getElementById('work-time').value);
+            restTime = parseInt(document.getElementById('rest-time').value);
+            totalRounds = parseInt(document.getElementById('rounds').value);
+            if (workTime < 5 || workTime > 180 || restTime < 5 || restTime > 180 || totalRounds < 1 || totalRounds > 20) {
+                alert('Please enter valid interval settings');
+                return;
+            }
+            currentRound = 1;
+            isWorkPhase = true;
+            currentTime = workTime;
+            intervalsRunning = true;
+            document.getElementById('interval-seconds').textContent = currentTime;
+            document.getElementById('interval-count').textContent = `Round ${currentRound}/${totalRounds}`;
+            document.getElementById('interval-state-badge').textContent = 'WORK';
+            document.getElementById('interval-state-badge').className = 'interval-badge work';
+            document.getElementById('interval-progress-bar').style.width = '100%';
+            document.querySelector('.intervals-setup').style.display = 'none';
+            document.getElementById('interval-display').style.display = 'block';
+            updateIntervalDisplay();
+            intervalTimer = setInterval(updateIntervalTimer, 1000);
+        }
+
+        function updateIntervalTimer() {
+            currentTime--;
+            if (currentTime <= 0) {
+                if (isWorkPhase) {
+                    isWorkPhase = false;
+                    currentTime = restTime;
+                    document.getElementById('interval-state-badge').textContent = 'REST';
+                    document.getElementById('interval-state-badge').className = 'interval-badge rest';
+                    playSound('rest');
+                } else {
+                    if (currentRound >= totalRounds) {
+                        completeIntervals();
+                        return;
+                    }
+                    currentRound++;
+                    isWorkPhase = true;
+                    currentTime = workTime;
+                    document.getElementById('interval-count').textContent = `Round ${currentRound}/${totalRounds}`;
+                    document.getElementById('interval-state-badge').textContent = 'WORK';
+                    document.getElementById('interval-state-badge').className = 'interval-badge work';
+                    playSound('work');
+                }
+            }
+            updateIntervalDisplay();
+        }
+
+        function updateIntervalDisplay() {
+            document.getElementById('interval-seconds').textContent = currentTime;
+            const maxTime = isWorkPhase ? workTime : restTime;
+            const progressPercentage = (currentTime / maxTime) * 100;
+            document.getElementById('interval-progress-bar').style.width = `${progressPercentage}%`;
+        }
+
+        function pauseIntervals() {
+            if (intervalsRunning) {
+                clearInterval(intervalTimer);
+                intervalsRunning = false;
+                document.getElementById('interval-pause-btn').innerHTML = '<i class="fas fa-play"></i> Resume';
+            } else {
+                intervalTimer = setInterval(updateIntervalTimer, 1000);
+                intervalsRunning = true;
+                document.getElementById('interval-pause-btn').innerHTML = '<i class="fas fa-pause"></i> Pause';
+            }
+        }
+
+        function resetIntervals() {
+            clearInterval(intervalTimer);
+            document.querySelector('.intervals-setup').style.display = 'block';
+            document.getElementById('interval-display').style.display = 'none';
+        }
+
+        function completeIntervals() {
+            clearInterval(intervalTimer);
+            const totalIntervalTime = (workTime + restTime) * totalRounds;
+            totalSeconds = totalIntervalTime;
+            showTimerTab('timer');
+            const minutesDisplay = document.getElementById('minutes');
+            const secondsDisplay = document.getElementById('seconds');
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            minutesDisplay.textContent = minutes.toString().padStart(2, '0');
+            secondsDisplay.textContent = seconds.toString().padStart(2, '0');
+            showCompletionPanel();
+        }
+
+        function playSound(type) {
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                if (type === 'work') {
+                    oscillator.frequency.value = 800;
+                    gainNode.gain.value = 0.3;
+                    oscillator.start();
+                    setTimeout(() => oscillator.stop(), 500);
+                } else {
+                    oscillator.frequency.value = 600;
+                    gainNode.gain.value = 0.3;
+                    oscillator.start();
+                    setTimeout(() => oscillator.stop(), 500);
+                }
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
+    </script>
+</body>
+</html>
