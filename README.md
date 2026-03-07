@@ -6,7 +6,7 @@ The system helps users plan workouts and diets while adapting recommendations ba
 
 ## Demo
 
-See the demo video: demo.mov
+A short demo of the accessible fitness tracker in action: https://youtu.be/HtnyeENhgmw 
 
 ## Features
 
